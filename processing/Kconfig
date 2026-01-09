@@ -1,0 +1,62 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config ROCKETALT_PROCESSING
+	bool "Altimeter processing logic"
+	default n
+	depends on UORB
+	depends on USENSOR
+	---help---
+		Primary logic for performing altimeter calculations. Includes altitude
+		estimation, filtering and event detection through the uORB framework.
+
+if ROCKETALT_PROCESSING
+
+comment "Program options"
+
+config ROCKETALT_PROCESSING_PRIORITY
+	int "Priority"
+	default 100
+	---help---
+		The task priority for the processing uORB topics.
+
+config ROCKETALT_PROCESSING_STACKSIZE
+	int "Stack size"
+	default 1024
+	---help---
+		The stack size for the processing uORB topics. These are small programs
+		which perform uORB operations.
+
+comment "Altitude fusion"
+
+config ROCKETALT_PROCESSING_ALTFUSION_QLEN
+	int "Altitude queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering altitude measurements.
+
+config ROCKETALT_PROCESSING_HEIGHTFUSION_QLEN
+	int "Height queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering height measurements.
+
+comment "Velocity fusion"
+
+config ROCKETALT_PROCESSING_VELFUSION_QLEN
+	int "Queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering velocity measurements.
+
+comment "Event detection"
+
+config ROCKETALT_PROCESSING_EVENT_QLEN
+	int "Queue length"
+	default 3
+	---help---
+		The length of the queue to use for buffering flight events.
+
+endif # ROCKETALT_PROCESSING

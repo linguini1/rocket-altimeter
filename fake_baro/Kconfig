@@ -1,0 +1,57 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config ROCKETALT_FAKE_BARO
+	bool "Fake barometer topic"
+	default n
+	depends on UORB
+	depends on USENSOR
+	---help---
+		Contains the implementation of a fake barometer to perform testing
+		without access to a real barometric pressure sensor.
+
+if ROCKETALT_FAKE_BARO
+
+comment "Program options"
+
+config ROCKETALT_FAKE_BARO_PRIORITY
+	int "Priority"
+	default 100
+	---help---
+		The task priority for the fake_baro uORB topic.
+
+config ROCKETALT_FAKE_BARO_STACKSIZE
+	int "Stack size"
+	default 1024
+	---help---
+		The stack size for the fake_baro uORB topic.
+
+comment "Fake data options"
+
+config ROCKETALT_FAKE_BARO_QSIZE
+	int "Queue size"
+	default 5
+	---help---
+		How many barometer measurements can be stored in the queue buffer at
+		once while publishing data.
+
+config ROCKETALT_FAKE_BARO_USECSV
+	bool "Publish fake data from CSV file"
+	depends on SENSORS_FAKESENSOR
+	default y
+	---help---
+		Implementation of the fake barometer using a CSV file from which data
+		can be read and published.
+
+if ROCKETALT_FAKE_BARO_USECSV
+
+config ROCKETALT_FAKE_BARO_CSVPATH
+	string "CSV file path"
+	---help---
+		The path to the CSV file to use for barometer data.
+
+endif # ROCKETALT_FAKE_BARO_USECSV
+
+endif # ROCKETALT_FAKE_BARO

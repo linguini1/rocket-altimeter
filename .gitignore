@@ -1,0 +1,13 @@
+# Build artifacts
+*.o
+*.built
+*.gcno
+*.gcda
+*.dep
+*.depend
+.kconfig
+/Kconfig
+
+# Tooling
+.cache/
+compile_commands.json
