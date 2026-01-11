@@ -7,6 +7,9 @@
 
 #include <nuttx/config.h>
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include <uORB/uORB.h>
 
 /****************************************************************************
@@ -25,13 +28,13 @@ struct fusion_height
   float height;       /* Height (from launch altitude) in meters */
 };
 
-struct fusion_velocity
+struct sensor_voltage
 {
   uint64_t timestamp; /* Timestamp in microseconds */
-  float velocity;     /* Velocity in m/s */
+  float voltage;      /* Voltage (Volts) */
 };
 
-enum event_e
+enum fevent_e
 {
   FEVENT_GROUNDED = 0, /* Rocket is waiting for liftoff */
   FEVENT_ASCENT = 1,   /* Rocket is ascending */
@@ -42,8 +45,31 @@ enum event_e
 
 struct flight_event
 {
-  uint64_t timestamp; /* Timestamp in microseconds */
-  enum event_e event; /* Flight event */
+  uint64_t timestamp;  /* Timestamp in microseconds */
+  enum fevent_e event; /* Flight event */
+};
+
+enum devent_e
+{
+  DEVENT_MAIN = 0,   /* Rocket is waiting for liftoff */
+  DEVENT_DROGUE = 1, /* Rocket is ascending */
+};
+
+struct deploy_event
+{
+  uint64_t timestamp;  /* Timestamp in microseconds */
+  enum devent_e event; /* Deployment event */
+};
+
+/* Altimeter configuration options */
+
+struct altconfig_s
+{
+  float main_alt;       /* Altitude for main deployment (m) */
+  float drogue_alt;     /* Altitude for drogue deployment (m) */
+  uint16_t main_time;   /* Time to deploy main (s) */
+  uint16_t drogue_time; /* Time to deploy drogue (s) */
+  bool drogue_apogee;   /* True: deploy drogue at apogee, false: altitude */
 };
 
 #endif // _ROCKETALT_COMMON_H

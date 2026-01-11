@@ -20,6 +20,11 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* Zero velocity detection in m/s */
+
+#define ZERO_VEL_TOL (0.8f)
+#define is_zero(vel, tol) ((vel) <= (tol) && (vel) >= -(tol))
+
 /* Array length helper */
 
 #define array_len(arr) (sizeof(arr) / sizeof(arr[0]))
@@ -77,7 +82,7 @@ int main(int argc, char **argv)
   union sensor_data data[2];
   struct pollfd fds[2];
   struct flight_event event;
-  enum event_e current = FEVENT_GROUNDED;
+  enum fevent_e current = FEVENT_GROUNDED;
 
   /* Set up flight event topic for publishing */
 
@@ -185,13 +190,12 @@ int main(int argc, char **argv)
           /* If our velocity reaches 0 and we are reasonably high up in the
            * air, then we have reached apogee!
            *
-           * TODO: have an actual velocity threshold, not just exactly 0.
            * TODO: have an actual apogee estimation threshold, not just
            * exactly 0.
            */
 
           if (data[HEIGHT_IDX].height.height >= 300.0f &&
-              data[VEL_IDX].vel.velocity == 0.0f)
+              is_zero(data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {
               event.event = FEVENT_APOGEE;
               event.timestamp = orb_absolute_time();
@@ -205,11 +209,14 @@ int main(int argc, char **argv)
 
           /* If our velocity is now negative, we're descending.
            *
+           * Typical descent velocity is around 25ft/s, so anything faster
+           * than 12ft/s should be good. That's ~3.6m/s.
+           *
            * TODO: should base this off of some amount of averaging time so
            * we don't just move to descent from one anomalous measurement.
            */
 
-          if (data[VEL_IDX].vel.velocity < -1.0f)
+          if (data[VEL_IDX].vel.velocity <= -3.6f)
             {
               event.event = FEVENT_DESCENT;
               event.timestamp = orb_absolute_time();
@@ -226,11 +233,9 @@ int main(int argc, char **argv)
            *
            * TODO: should base this off of some amount of averaging time so
            * we don't just move to descent from one anomalous measurement.
-           *
-           * TODO: this should use a threshold and not just exactly 0.
            */
 
-          if (data[VEL_IDX].vel.velocity == 0.0f)
+          if (is_zero(data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {
               event.event = FEVENT_LANDED;
               event.timestamp = orb_absolute_time();

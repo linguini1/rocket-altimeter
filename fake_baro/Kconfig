@@ -30,8 +30,8 @@ config ROCKETALT_FAKE_BARO_STACKSIZE
 
 comment "Fake data options"
 
-config ROCKETALT_FAKE_BARO_QSIZE
-	int "Queue size"
+config ROCKETALT_FAKE_BARO_QLEN
+	int "Queue length"
 	default 5
 	---help---
 		How many barometer measurements can be stored in the queue buffer at

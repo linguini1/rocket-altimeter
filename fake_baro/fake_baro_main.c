@@ -53,7 +53,7 @@ int main(int argc, char **argv)
 
   err = fakesensor_init(SENSOR_TYPE_BAROMETER,
                         CONFIG_ROCKETALT_FAKE_BARO_CSVPATH, 0,
-                        CONFIG_ROCKETALT_FAKE_BARO_QSIZE);
+                        CONFIG_ROCKETALT_FAKE_BARO_QLEN);
   if (err < 0)
     {
       syslog(LOG_ERR | LOG_USER, "Could not register fake sensor_baro0: %d\n",
