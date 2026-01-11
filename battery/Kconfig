@@ -1,0 +1,55 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config ROCKETALT_BATMON
+	bool "Altimeter battery monitor"
+	default n
+	depends on UORB
+	depends on USENSOR
+	---help---
+		Monitors battery voltage and outputs it via uORB.
+
+if ROCKETALT_BATMON
+
+comment "Program options"
+
+config ROCKETALT_BATMON_PRIORITY
+	int "Priority"
+	default 100
+	---help---
+		The task priority for the batmon uORB topics.
+
+config ROCKETALT_BATMON_STACKSIZE
+	int "Stack size"
+	default 1024
+	---help---
+		The stack size for the batmon uORB topics. These are small programs
+		which perform uORB operations.
+
+comment "General"
+
+config ROCKETALT_BATMON_VOLTAGE_QLEN
+	int "Battery measurement queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering battery measurements.
+
+config ROCKETALT_BATMON_ADCPATH
+	string "ADC device path"
+	default "/dev/adc0"
+	---help---
+		The path to the ADC device where battery voltage can be read.
+
+config ROCKETALT_BATMON_ADCRESOLUTION
+	int "ADC resolution (bits)"
+	---help---
+		The ADC's resolution in bits.
+
+config ROCKETALT_BATMON_BATMAX
+	int "Battery max voltage (mV)"
+	---help---
+		The battery's maximum voltage in millivolts.
+
+endif # ROCKETALT_BATMON

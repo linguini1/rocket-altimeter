@@ -1,0 +1,12 @@
+include $(APPDIR)/Make.defs
+
+MODULE    = $(CONFIG_ROCKETALT_BATMON)
+PRIORITY  = $(CONFIG_ROCKETALT_BATMON_PRIORITY)
+STACKSIZE = $(CONFIG_ROCKETALT_BATMON_STACKSIZE)
+PROGNAME  = batmon
+
+# Source files
+
+MAINSRC += batmon_main.c
+
+include $(APPDIR)/Application.mk
