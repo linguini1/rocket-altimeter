@@ -1,0 +1,47 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config ROCKETALT_DEPLOYMENT
+	bool "Fake barometer topic"
+	default n
+	depends on UORB
+	depends on USENSOR
+	---help---
+		Contains the implementation of a fake barometer to perform testing
+		without access to a real barometric pressure sensor.
+
+if ROCKETALT_DEPLOYMENT
+
+comment "Program options"
+
+config ROCKETALT_DEPLOYMENT_PRIORITY
+	int "Priority"
+	default 100
+	---help---
+		The task priority for the deployment program.
+
+config ROCKETALT_DEPLOYMENT_STACKSIZE
+	int "Stack size"
+	default 1024
+	---help---
+		The stack size for the deployment program.
+
+comment "General options"
+
+config ROCKETALT_DEPLOYMENT_QLEN
+	int "Queue length"
+	default 5
+	---help---
+		How many deployment events can be stored in the queue buffer at
+		once while publishing data.
+
+config ROCKETALT_DEPLOYMENT_MOCK
+	bool "Mocking mode"
+	default n
+	---help---
+		Enables mocking mode; hardware acuations that cause deployment are
+		replaced with INFO syslogs.
+
+endif # ROCKETALT_DEPLOYMENT

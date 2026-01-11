@@ -1,0 +1,12 @@
+include $(APPDIR)/Make.defs
+
+MODULE    = $(CONFIG_ROCKETALT_DEPLOYMENT)
+PRIORITY  = $(CONFIG_ROCKETALT_DEPLOYMENT_PRIORITY)
+STACKSIZE = $(CONFIG_ROCKETALT_DEPLOYMENT_STACKSIZE)
+PROGNAME  = deployment
+
+# Source files
+
+MAINSRC  = deployment_main.c
+
+include $(APPDIR)/Application.mk
