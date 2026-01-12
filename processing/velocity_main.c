@@ -35,13 +35,13 @@ ORB_DECLARE(fusion_altitude);
 /* Optional debug output format string */
 
 #ifdef CONFIG_DEBUG_UORB
-static const char fusion_velocity_format[] =
-    "fusion_velocity - timestamp:%" PRIu64 ",velocity:%hf";
+static const char sensor_velocity_format[] =
+    "sensor_velocity - timestamp:%" PRIu64 ",velocity:%hf";
 #endif
 
 /* Definition for altitude topic */
 
-ORB_DEFINE(fusion_velocity, struct fusion_velocity, fusion_velocity_format);
+ORB_DEFINE(sensor_velocity, struct sensor_velocity, sensor_velocity_format);
 
 /****************************************************************************
  * Private Function Prototypes
@@ -51,10 +51,10 @@ ORB_DEFINE(fusion_velocity, struct fusion_velocity, fusion_velocity_format);
  * Private Functions
  ****************************************************************************/
 
-static struct fusion_velocity vel_from_alt(struct fusion_altitude *prev,
+static struct sensor_velocity vel_from_alt(struct fusion_altitude *prev,
                                            struct fusion_altitude *cur)
 {
-  return (struct fusion_velocity){
+  return (struct sensor_velocity){
       .timestamp = prev->timestamp,
       .velocity = (cur->altitude - prev->altitude) /
                   ((cur->timestamp - prev->timestamp) * US_TO_S),
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
   int err;
   int vel_fd;
   int alt_fd;
-  struct fusion_velocity vel_data;
+  struct sensor_velocity vel_data;
   struct fusion_altitude prev_alt;
   struct fusion_altitude cur_alt;
   struct pollfd pfd;
@@ -78,16 +78,16 @@ int main(int argc, char **argv)
   /* Set up velocity fusion topic for publishing */
 
   vel_fd =
-      orb_advertise_multi_queue(ORB_ID(fusion_velocity), NULL, NULL,
+      orb_advertise_multi_queue(ORB_ID(sensor_velocity), NULL, NULL,
                                 CONFIG_ROCKETALT_PROCESSING_VELFUSION_QLEN);
   if (vel_fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
-             "Could not advertise fusion_velocity topic: %d\n", errno);
+             "Could not advertise sensor_velocity topic: %d\n", errno);
       return EXIT_FAILURE;
     }
 
-  syslog(LOG_INFO | LOG_USER, "fusion_velocity topic advertised.\n");
+  syslog(LOG_INFO | LOG_USER, "sensor_velocity topic advertised.\n");
 
   /* Subscribe to first altitude topic */
 
@@ -118,7 +118,7 @@ int main(int argc, char **argv)
         }
 
       err = orb_copy(ORB_ID(fusion_altitude), alt_fd, &cur_alt);
-      if (err < 0)
+      if (err)
         {
           if (errno != ENODATA)
             {
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
       vel_data = vel_from_alt(&prev_alt, &cur_alt);
       prev_alt = cur_alt;
 
-      err = orb_publish(ORB_ID(fusion_velocity), vel_fd, &vel_data);
+      err = orb_publish(ORB_ID(sensor_velocity), vel_fd, &vel_data);
       if (err)
         {
           syslog(LOG_ERR | LOG_USER, "Couldn't publish velocity data: %d\n",

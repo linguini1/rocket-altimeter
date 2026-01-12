@@ -219,7 +219,7 @@ int main(int argc, char **argv)
         }
 
       err = orb_copy(ORB_ID(sensor_baro), baro_fd, &baro_data);
-      if (err < 0)
+      if (err)
         {
           if (errno != ENODATA)
             {

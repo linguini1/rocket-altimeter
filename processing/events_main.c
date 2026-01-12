@@ -23,7 +23,33 @@
 /* Zero velocity detection in m/s */
 
 #define ZERO_VEL_TOL (0.8f)
+
 #define is_zero(vel, tol) ((vel) <= (tol) && (vel) >= -(tol))
+
+/* Descent velocity bound.
+ * Typical descent velocity is around 25ft/s, so anything faster
+ * than 12ft/s should be good. That's ~3.6m/s.
+ */
+
+#define MIN_DESCENT_VEL (-3.6f)
+
+/* Minimum take-off velocity
+ * 12m/s -> ~40kmph which should be hard to achieve accidentally
+ */
+
+#define MIN_TAKEOFF_VEL (12.0f)
+
+/* Minimum take-off altitude
+ * Allow 1s latency in detecting take-off by taking `MIN_TAKEOFF_VEL * 1` to
+ * be our minimum altitude increase at take-off. This is acceptable since no
+ * deployment logic (should) happen during the first second of ascent.
+ */
+
+#define MIN_TAKEOFF_ALT MIN_TAKEOFF_VEL
+
+/* Percentage of apogee reached to detect apogee */
+
+#define APOGEE_PERCENTAGE (0.8f)
 
 /* Array length helper */
 
@@ -37,7 +63,7 @@
 /* Program already knows about some topics */
 
 ORB_DECLARE(fusion_height);
-ORB_DECLARE(fusion_velocity);
+ORB_DECLARE(sensor_velocity);
 
 /****************************************************************************
  * Private Types
@@ -46,12 +72,16 @@ ORB_DECLARE(fusion_velocity);
 union sensor_data
 {
   struct fusion_height height;
-  struct fusion_velocity vel;
+  struct sensor_velocity vel;
 };
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
+
+static struct processconfig_s dummy_config = {
+    .pred_apogee = 2000.0f,
+};
 
 /* Optional debug output format string */
 
@@ -112,11 +142,11 @@ int main(int argc, char **argv)
 
   /* Subscribe to velocity topic */
 
-  vel_fd = orb_subscribe_multi(ORB_ID(fusion_velocity), 0);
+  vel_fd = orb_subscribe_multi(ORB_ID(sensor_velocity), 0);
   if (vel_fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
-             "Could not subscribe to fusion_velocity0: %d\n", errno);
+             "Could not subscribe to sensor_velocity0: %d\n", errno);
       ret = EXIT_FAILURE;
       goto clean_alt;
     }
@@ -172,12 +202,10 @@ int main(int argc, char **argv)
         case FEVENT_GROUNDED:
           /* If height has increased by some amount and velocity is
            * high, we are now going up.
-           *
-           * TODO: add thresholds
            */
 
-          if (data[HEIGHT_IDX].height.height >= 10.0f &&
-              data[VEL_IDX].vel.velocity > 10.0f)
+          if (data[HEIGHT_IDX].height.height >= MIN_TAKEOFF_ALT &&
+              data[VEL_IDX].vel.velocity >= MIN_TAKEOFF_VEL)
             {
               event.event = FEVENT_ASCENT;
               event.timestamp = orb_absolute_time();
@@ -187,14 +215,12 @@ int main(int argc, char **argv)
           break;
 
         case FEVENT_ASCENT:
-          /* If our velocity reaches 0 and we are reasonably high up in the
-           * air, then we have reached apogee!
-           *
-           * TODO: have an actual apogee estimation threshold, not just
-           * exactly 0.
+          /* If our velocity reaches 0 and we are reasonably close to the
+           * predicted apogee, then we have reached apogee!
            */
 
-          if (data[HEIGHT_IDX].height.height >= 300.0f &&
+          if (data[HEIGHT_IDX].height.height >=
+                  APOGEE_PERCENTAGE * dummy_config.pred_apogee &&
               is_zero(data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {
               event.event = FEVENT_APOGEE;
@@ -209,14 +235,11 @@ int main(int argc, char **argv)
 
           /* If our velocity is now negative, we're descending.
            *
-           * Typical descent velocity is around 25ft/s, so anything faster
-           * than 12ft/s should be good. That's ~3.6m/s.
-           *
            * TODO: should base this off of some amount of averaging time so
            * we don't just move to descent from one anomalous measurement.
            */
 
-          if (data[VEL_IDX].vel.velocity <= -3.6f)
+          if (data[VEL_IDX].vel.velocity <= MIN_DESCENT_VEL)
             {
               event.event = FEVENT_DESCENT;
               event.timestamp = orb_absolute_time();

@@ -4,7 +4,7 @@
 #
 
 config ROCKETALT_DEPLOYMENT
-	bool "Fake barometer topic"
+	bool "Deployment logic"
 	default n
 	depends on UORB
 	depends on USENSOR

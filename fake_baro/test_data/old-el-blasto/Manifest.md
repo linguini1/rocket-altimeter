@@ -3,7 +3,7 @@
 ## Characteristics
 
 Max speed: ?
-Apogee: ?
+Apogee: 8352 m (8.4 km)
 
 ## Source
 

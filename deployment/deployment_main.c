@@ -51,7 +51,7 @@ union sensor_data
  * Private Data
  ****************************************************************************/
 
-static struct altconfig_s dummy_conf = {
+static struct depconfig_s dummy_conf = {
     .main_alt = 1000.0f,
     .drogue_alt = 2000.0f,
     .main_time = 18,
@@ -62,7 +62,7 @@ static struct altconfig_s dummy_conf = {
 /* Optional debug output format string */
 
 #ifdef CONFIG_DEBUG_UORB
-static const char flight_event_format[] =
+static const char deploy_event_format[] =
     "deploy_event - timestamp:%" PRIu64 ",event:%u";
 #endif
 
