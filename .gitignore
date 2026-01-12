@@ -11,3 +11,6 @@
 # Tooling
 .cache/
 compile_commands.json
+
+# Python
+venv/
