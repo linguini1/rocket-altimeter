@@ -20,6 +20,12 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* Low-pass filter alpha for computing filtered velocity */
+
+#define LP_ALPHA (0.98f)
+
+#define lp_filter(old, new) (LP_ALPHA * (old)) + (1 - LP_ALPHA) * (new);
+
 /* Microsecond to second conversion factor */
 
 #define US_TO_S (1e-06)
@@ -57,7 +63,7 @@ static struct sensor_velocity vel_from_alt(struct fusion_altitude *prev,
   return (struct sensor_velocity){
       .timestamp = prev->timestamp,
       .velocity = (cur->altitude - prev->altitude) /
-                  ((cur->timestamp - prev->timestamp) * US_TO_S),
+                  ((float)(cur->timestamp - prev->timestamp) * US_TO_S),
   };
 }
 
@@ -70,6 +76,7 @@ int main(int argc, char **argv)
   int err;
   int vel_fd;
   int alt_fd;
+  float prev_vel = 0.0f;
   struct sensor_velocity vel_data;
   struct fusion_altitude prev_alt;
   struct fusion_altitude cur_alt;
@@ -128,8 +135,15 @@ int main(int argc, char **argv)
           continue;
         }
 
+      /* Calculate raw velocity */
+
       vel_data = vel_from_alt(&prev_alt, &cur_alt);
       prev_alt = cur_alt;
+
+      /* Low pass filtering */
+
+      vel_data.velocity = lp_filter(prev_vel, vel_data.velocity);
+      prev_vel = vel_data.velocity;
 
       err = orb_publish(ORB_ID(sensor_velocity), vel_fd, &vel_data);
       if (err)

@@ -92,7 +92,7 @@ def main() -> None:
     # Low-pass filtered data
     rocket_data["height-filtered"] = gen_avg(rocket_data["height"], 0.95, 0)
     rocket_data["altitude-filtered"] = gen_avg(rocket_data["altitude"], 0.95, 0)
-    rocket_data["velocity-filtered"] = gen_avg(rocket_data["velocity"], 0.95, 0)
+    rocket_data["velocity-filtered"] = gen_avg(rocket_data["velocity"], 0.99, 0)
 
     # Velocity made from low-pass filtered data
     rocket_data["velocity-from-filtered"] = []
@@ -104,8 +104,8 @@ def main() -> None:
         last_alt = alt
 
     # plot_data(plt, data=rocket_data, name="height", unit="meters")
-    plot_data(plt, data=rocket_data, name="height-filtered", unit="meters")
-    plot_data(plt, data=rocket_data, name="velocity", unit="meters/second")
+    # plot_data(plt, data=rocket_data, name="height-filtered", unit="meters")
+    # plot_data(plt, data=rocket_data, name="velocity", unit="meters/second")
     plot_data(
         plt, data=rocket_data, name="velocity-filtered", unit="meters/second"
     )
