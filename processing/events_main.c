@@ -105,6 +105,7 @@ ORB_DEFINE(flight_event, struct flight_event, flight_event_format);
 static float velbuf[NUMVEL_SAMPLES];
 static struct circbuf_s velocities =
     CIRCBUF_INITIALIZER(velbuf, sizeof(velbuf));
+static float g_avg_vel;
 
 /****************************************************************************
  * Private Function Prototypes
@@ -114,14 +115,31 @@ static struct circbuf_s velocities =
  * Private Functions
  ****************************************************************************/
 
-static float avg_vel(void)
+static void update_avg_vel(float new)
 {
-  float vel = 0.0f;
-  for (unsigned i = 0; i < NUMVEL_SAMPLES; i++)
+  float old;
+  if (circbuf_is_full(&velocities))
     {
-      vel += velbuf[i] / (float)NUMVEL_SAMPLES;
+      /* Remove old value from calculation and add new value */
+
+      circbuf_read(&velocities, &old, sizeof(old));
+      circbuf_write(&velocities, &new, sizeof(old));
+      g_avg_vel -= (old / (float)NUMVEL_SAMPLES);
+      g_avg_vel += (new / (float)NUMVEL_SAMPLES);
     }
-  return vel;
+  else
+    {
+      /* Compute average velocity based off current samples only. This path
+       * only happens for the first `NUMVEL_SAMPLES`.
+       */
+
+      g_avg_vel = 0.0f;
+      unsigned num_measures = circbuf_used(&velocities) / sizeof(float);
+      for (unsigned i = 0; i < num_measures; i++)
+        {
+          g_avg_vel += (velbuf[i] / (float)num_measures);
+        }
+    }
 }
 
 /****************************************************************************
@@ -187,9 +205,9 @@ int main(int argc, char **argv)
   fds[VEL_IDX].events = POLLIN;
   fds[VEL_IDX].revents = 0;
 
-  /* Give an initial value to our data that is consistent with FEVENT_GROUNDED
-   * so we don't compute a crazy event. Zero velocity and zero height is
-   * reasonable for this.
+  /* Give an initial value to our data that is consistent with
+   * FEVENT_GROUNDED so we don't compute a crazy event. Zero velocity
+   * and zero height is reasonable for this.
    */
 
   memset(data, 0, sizeof(data));
@@ -216,12 +234,11 @@ int main(int argc, char **argv)
               orb_copy_multi(fds[i].fd, &data[i], sizeof(union sensor_data));
               fds[i].revents = 0; /* Clear events */
 
-              /* Store velocities in our averaging list */
+              /* Update our average velocity */
 
               if (i == VEL_IDX)
                 {
-                  circbuf_overwrite(&velocities, &data[i].vel.velocity,
-                                    sizeof(float));
+                  update_avg_vel(data[i].vel.velocity);
                 }
             }
         }
@@ -248,13 +265,14 @@ int main(int argc, char **argv)
           break;
 
         case FEVENT_ASCENT:
-          /* If our velocity reaches 0 and we are reasonably close to the
-           * predicted apogee, then we have reached apogee!
+          /* If our velocity reaches 0 and we are reasonably close to
+           * the predicted apogee, then we have reached apogee!
            */
 
           if (data[HEIGHT_IDX].height.height >=
                   APOGEE_PERCENTAGE * dummy_config.pred_apogee &&
-              is_zero(avg_vel(), ZERO_VEL_TOL))
+              is_zero(g_avg_vel, ZERO_VEL_TOL) &&
+              is_zero(data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {
               event.event = FEVENT_APOGEE;
               event.timestamp = orb_absolute_time();
@@ -268,7 +286,7 @@ int main(int argc, char **argv)
 
           /* If our velocity is now negative, we're descending. */
 
-          if (avg_vel() <= MIN_DESCENT_VEL)
+          if (g_avg_vel <= MIN_DESCENT_VEL)
             {
               event.event = FEVENT_DESCENT;
               event.timestamp = orb_absolute_time();
@@ -284,7 +302,8 @@ int main(int argc, char **argv)
            * descending and therefore must have landed.
            */
 
-          if (is_zero(avg_vel(), ZERO_VEL_TOL))
+          if (is_zero(g_avg_vel, ZERO_VEL_TOL) &&
+              is_zero(data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {
               event.event = FEVENT_LANDED;
               event.timestamp = orb_absolute_time();
@@ -317,8 +336,8 @@ int main(int argc, char **argv)
                      errno);
             }
 
-          /* We update our current state regardless of whether or not the
-           * event was published.
+          /* We update our current state regardless of whether or not
+           * the event was published.
            */
 
           current = event.event;
