@@ -12,6 +12,8 @@
 #include <sys/types.h>
 #include <syslog.h>
 
+#include <nuttx/circbuf.h>
+
 #include <uORB/uORB.h>
 
 #include "../common/common.h"
@@ -47,6 +49,10 @@
 
 #define MIN_TAKEOFF_ALT MIN_TAKEOFF_VEL
 
+/* Number of velocity measurements to average */
+
+#define NUMVEL_SAMPLES (10)
+
 /* Percentage of apogee reached to detect apogee */
 
 #define APOGEE_PERCENTAGE (0.8f)
@@ -80,7 +86,7 @@ union sensor_data
  ****************************************************************************/
 
 static struct processconfig_s dummy_config = {
-    .pred_apogee = 2000.0f,
+    .pred_apogee = 8000.0f,
 };
 
 /* Optional debug output format string */
@@ -94,9 +100,29 @@ static const char flight_event_format[] =
 
 ORB_DEFINE(flight_event, struct flight_event, flight_event_format);
 
+/* Buffer for averaging velocity */
+
+static float velbuf[NUMVEL_SAMPLES];
+static struct circbuf_s velocities =
+    CIRCBUF_INITIALIZER(velbuf, sizeof(velbuf));
+
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
+
+/****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+static float avg_vel(void)
+{
+  float vel = 0.0f;
+  for (unsigned i = 0; i < NUMVEL_SAMPLES; i++)
+    {
+      vel += velbuf[i] / (float)NUMVEL_SAMPLES;
+    }
+  return vel;
+}
 
 /****************************************************************************
  * Public Functions
@@ -172,7 +198,6 @@ int main(int argc, char **argv)
 
   for (;;)
     {
-
       /* Poll to read some height and velocity data */
 
       err = poll(fds, array_len(fds), -1);
@@ -190,6 +215,14 @@ int main(int argc, char **argv)
             {
               orb_copy_multi(fds[i].fd, &data[i], sizeof(union sensor_data));
               fds[i].revents = 0; /* Clear events */
+
+              /* Store velocities in our averaging list */
+
+              if (i == VEL_IDX)
+                {
+                  circbuf_overwrite(&velocities, &data[i].vel.velocity,
+                                    sizeof(float));
+                }
             }
         }
 
@@ -221,7 +254,7 @@ int main(int argc, char **argv)
 
           if (data[HEIGHT_IDX].height.height >=
                   APOGEE_PERCENTAGE * dummy_config.pred_apogee &&
-              is_zero(data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
+              is_zero(avg_vel(), ZERO_VEL_TOL))
             {
               event.event = FEVENT_APOGEE;
               event.timestamp = orb_absolute_time();
@@ -233,13 +266,9 @@ int main(int argc, char **argv)
 
         case FEVENT_APOGEE:
 
-          /* If our velocity is now negative, we're descending.
-           *
-           * TODO: should base this off of some amount of averaging time so
-           * we don't just move to descent from one anomalous measurement.
-           */
+          /* If our velocity is now negative, we're descending. */
 
-          if (data[VEL_IDX].vel.velocity <= MIN_DESCENT_VEL)
+          if (avg_vel() <= MIN_DESCENT_VEL)
             {
               event.event = FEVENT_DESCENT;
               event.timestamp = orb_absolute_time();
@@ -253,12 +282,9 @@ int main(int argc, char **argv)
 
           /* If our velocity is 0, we have a constant height after
            * descending and therefore must have landed.
-           *
-           * TODO: should base this off of some amount of averaging time so
-           * we don't just move to descent from one anomalous measurement.
            */
 
-          if (is_zero(data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
+          if (is_zero(avg_vel(), ZERO_VEL_TOL))
             {
               event.event = FEVENT_LANDED;
               event.timestamp = orb_absolute_time();
