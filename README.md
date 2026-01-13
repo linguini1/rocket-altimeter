@@ -24,10 +24,8 @@ application(s) and the `fake_baro` application. Once you've configured both
 programs to your liking, run them in the following order:
 
 ```console
-nsh> fake_baro
-nsh> altitude_fusion &
-nsh> velocity_fusion &
-nsh> events_topic &
+nsh> fake_baro; altitude_fusion &; velocity_fusion & events_topic &;
+nsh> deployment &
 ```
 
 You can then look at the published data from the topics using `uorb_listener`,

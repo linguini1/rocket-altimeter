@@ -59,4 +59,10 @@ config ROCKETALT_PROCESSING_EVENT_QLEN
 	---help---
 		The length of the queue to use for buffering flight events.
 
+config ROCKETALT_PROCESSING_EVENT_SYSLOG
+	bool "Syslog event output"
+	default n
+	---help---
+		If enabled, flight event changes are syslogged as INFO.
+
 endif # ROCKETALT_PROCESSING

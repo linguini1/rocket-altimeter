@@ -52,8 +52,8 @@ union sensor_data
  ****************************************************************************/
 
 static struct depconfig_s dummy_conf = {
-    .main_alt = 1000.0f,
-    .drogue_alt = 2000.0f,
+    .main_alt = 4000.0f,
+    .drogue_alt = 8000.0f,
     .main_time = 18,
     .drogue_time = 26,
     .drogue_apogee = true,
@@ -126,6 +126,8 @@ int main(int argc, char **argv)
   int dep_fd;
   struct pollfd fds[2];
   union sensor_data data[2];
+  bool drogue_deployed = false;
+  bool main_deployed = false;
 
   /* Set up flight event topic for publishing */
 
@@ -238,7 +240,8 @@ int main(int argc, char **argv)
        * effectively checks for apogee or ascent.
        */
 
-      if (data[HEIGHT_IDX].height.height >= dummy_conf.main_alt &&
+      if (!main_deployed &&
+          data[HEIGHT_IDX].height.height <= dummy_conf.main_alt &&
           data[EVENT_IDX].event.event >= FEVENT_APOGEE)
         {
           err = deploy_main();
@@ -246,7 +249,15 @@ int main(int argc, char **argv)
             {
               syslog(LOG_ERR | LOG_USER, "Couldn't deploy main: %d\n", err);
             }
-          publish_deployment(dep_fd, DEVENT_MAIN);
+          else
+            {
+              main_deployed = true;
+              publish_deployment(dep_fd, DEVENT_MAIN);
+#ifdef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
+              syslog(LOG_INFO | LOG_USER, "Deployed main at %.2f m\n",
+                     data[HEIGHT_IDX].height.height);
+#endif
+            }
         }
 
       if (dummy_conf.drogue_apogee)
@@ -255,7 +266,8 @@ int main(int argc, char **argv)
            * deploy at apogee, deploy it.
            */
 
-          if (data[EVENT_IDX].event.event == FEVENT_APOGEE)
+          if (!drogue_deployed &&
+              data[EVENT_IDX].event.event == FEVENT_APOGEE)
             {
               err = deploy_drogue();
               if (err)
@@ -263,14 +275,23 @@ int main(int argc, char **argv)
                   syslog(LOG_ERR | LOG_USER, "Couldn't deploy drogue: %d\n",
                          err);
                 }
-              publish_deployment(dep_fd, DEVENT_DROGUE);
+              else
+                {
+                  drogue_deployed = true;
+                  publish_deployment(dep_fd, DEVENT_DROGUE);
+#ifdef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
+                  syslog(LOG_INFO | LOG_USER, "Deployed drogue at %.2f m\n",
+                         data[HEIGHT_IDX].height.height);
+#endif
+                }
             }
         }
       else
         {
           /* Drogue gets deployed at specific altitude */
 
-          if (data[HEIGHT_IDX].height.height >= dummy_conf.drogue_alt &&
+          if (!drogue_deployed &&
+              data[HEIGHT_IDX].height.height <= dummy_conf.drogue_alt &&
               data[EVENT_IDX].event.event >= FEVENT_APOGEE)
             {
               err = deploy_drogue();
@@ -279,7 +300,15 @@ int main(int argc, char **argv)
                   syslog(LOG_ERR | LOG_USER, "Couldn't deploy drogue: %d\n",
                          err);
                 }
-              publish_deployment(dep_fd, DEVENT_DROGUE);
+              else
+                {
+                  drogue_deployed = true;
+                  publish_deployment(dep_fd, DEVENT_DROGUE);
+#ifdef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
+                  syslog(LOG_INFO | LOG_USER, "Deployed drogue at %.2f m\n",
+                         data[HEIGHT_IDX].height.height);
+#endif
+                }
             }
         }
     }

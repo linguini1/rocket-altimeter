@@ -100,6 +100,16 @@ static const char flight_event_format[] =
 
 ORB_DEFINE(flight_event, struct flight_event, flight_event_format);
 
+/* Syslog printing flight events */
+
+#ifdef CONFIG_ROCKETALT_PROCESSING_EVENT_SYSLOG
+static const char *FEVENT_STR[] = {
+    [FEVENT_GROUNDED] = "Grounded", [FEVENT_ASCENT] = "Ascent",
+    [FEVENT_APOGEE] = "Apogee",     [FEVENT_DESCENT] = "Descent",
+    [FEVENT_LANDED] = "Landed",
+};
+#endif
+
 /* Buffer for averaging velocity */
 
 static float velbuf[NUMVEL_SAMPLES];
@@ -341,6 +351,10 @@ int main(int argc, char **argv)
            */
 
           current = event.event;
+#ifdef CONFIG_ROCKETALT_PROCESSING_EVENT_SYSLOG
+          syslog(LOG_INFO | LOG_USER, "Flight event: %s\n",
+                 FEVENT_STR[event.event]);
+#endif
         }
     }
 
