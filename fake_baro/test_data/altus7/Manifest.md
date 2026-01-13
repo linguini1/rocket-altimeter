@@ -3,7 +3,7 @@
 ## Characteristics
 
 Max speed: 480 m/s (Mach 1.39)
-Apogee: 12000 m (12 km)
+Apogee: 12800 m (12.8 km)
 
 ## Source
 
