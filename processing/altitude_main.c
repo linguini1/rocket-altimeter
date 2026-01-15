@@ -20,6 +20,10 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* Low pass filter alpha for height */
+
+#define LP_ALPHA (0.98)
+
 /* Pressure at sea-level in millibars */
 
 #define SEA_PRESSURE (1013.25f)
@@ -132,6 +136,7 @@ int main(int argc, char **argv)
   struct fusion_altitude cur_alt;
   struct fusion_altitude launch_alt;
   struct fusion_height height;
+  float prevheight = 0.0f;
   struct pollfd pfd;
 
   /* Get which barometer instance should be used if one is provided.
@@ -251,6 +256,8 @@ int main(int argc, char **argv)
       /* Publish our computed height */
 
       height = height_from_alt(&launch_alt, &cur_alt);
+      height.height = lp_filter(prevheight, height.height, LP_ALPHA);
+      prevheight = height.height;
 
       orb_publish(ORB_ID(fusion_height), height_fd, &height);
       if (err)

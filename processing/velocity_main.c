@@ -22,9 +22,7 @@
 
 /* Low-pass filter alpha for computing filtered velocity */
 
-#define LP_ALPHA (0.98f)
-
-#define lp_filter(old, new) (LP_ALPHA * (old)) + (1 - LP_ALPHA) * (new);
+#define LP_ALPHA (0.98)
 
 /* Microsecond to second conversion factor */
 
@@ -142,7 +140,7 @@ int main(int argc, char **argv)
 
       /* Low pass filtering */
 
-      vel_data.velocity = lp_filter(prev_vel, vel_data.velocity);
+      vel_data.velocity = lp_filter(prev_vel, vel_data.velocity, LP_ALPHA);
       prev_vel = vel_data.velocity;
 
       err = orb_publish(ORB_ID(sensor_velocity), vel_fd, &vel_data);
