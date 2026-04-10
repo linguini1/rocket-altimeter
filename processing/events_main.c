@@ -102,7 +102,7 @@ ORB_DEFINE(flight_event, struct flight_event, flight_event_format);
 
 /* Syslog printing flight events */
 
-#ifdef CONFIG_ROCKETALT_PROCESSING_EVENT_SYSLOG
+#ifdef CONFIG_ROCKETALT_EVENT_SYSLOG
 static const char *FEVENT_STR[] = {
     [FEVENT_GROUNDED] = "Grounded", [FEVENT_ASCENT] = "Ascent",
     [FEVENT_APOGEE] = "Apogee",     [FEVENT_DESCENT] = "Descent",
@@ -172,7 +172,7 @@ int main(int argc, char **argv)
 
   event_fd =
       orb_advertise_multi_queue(ORB_ID(flight_event), NULL, NULL,
-                                CONFIG_ROCKETALT_PROCESSING_EVENT_QLEN);
+                                CONFIG_ROCKETALT_EVENT_QLEN);
   if (event_fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
@@ -351,7 +351,7 @@ int main(int argc, char **argv)
            */
 
           current = event.event;
-#ifdef CONFIG_ROCKETALT_PROCESSING_EVENT_SYSLOG
+#ifdef CONFIG_ROCKETALT_EVENT_SYSLOG
           syslog(LOG_INFO | LOG_USER, "Flight event: %s\n",
                  FEVENT_STR[event.event]);
 #endif

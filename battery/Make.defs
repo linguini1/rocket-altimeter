@@ -1,3 +1,0 @@
-ifneq ($(CONFIG_ROCKETALT_BATMON),)
-CONFIGURED_APPS += $(APPDIR)/rocket-altimeter/batmon
-endif

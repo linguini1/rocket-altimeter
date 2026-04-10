@@ -29,40 +29,81 @@ config ROCKETALT_PROCESSING_STACKSIZE
 		The stack size for the processing uORB topics. These are small programs
 		which perform uORB operations.
 
-comment "Altitude fusion"
+menu "Altitude fusion"
 
-config ROCKETALT_PROCESSING_ALTFUSION_QLEN
+config ROCKETALT_ALTFUSION_QLEN
 	int "Altitude queue length"
 	default 5
 	---help---
 		The length of the queue to use for buffering altitude measurements.
 
-config ROCKETALT_PROCESSING_HEIGHTFUSION_QLEN
+config ROCKETALT_HEIGHTFUSION_QLEN
 	int "Height queue length"
 	default 5
 	---help---
 		The length of the queue to use for buffering height measurements.
 
-comment "Velocity fusion"
+endmenu # Altitude fusion
 
-config ROCKETALT_PROCESSING_VELFUSION_QLEN
+menu "Velocity Fusion"
+
+config ROCKETALT_VELFUSION_QLEN
 	int "Queue length"
 	default 5
 	---help---
 		The length of the queue to use for buffering velocity measurements.
 
-comment "Event detection"
+endmenu # Velocity Fusion
 
-config ROCKETALT_PROCESSING_EVENT_QLEN
+menu "Event detection"
+
+config ROCKETALT_EVENT_QLEN
 	int "Queue length"
 	default 3
 	---help---
 		The length of the queue to use for buffering flight events.
 
-config ROCKETALT_PROCESSING_EVENT_SYSLOG
+config ROCKETALT_EVENT_SYSLOG
 	bool "Syslog event output"
 	default n
 	---help---
 		If enabled, flight event changes are syslogged as INFO.
+
+endmenu # Event detection
+
+config ROCKETALT_PROCESSING_BATMON
+	bool "ADC battery monitor"
+	default n
+	depends on ADC
+	---help---
+		Enable support for monitoring a battery connected to an ADC interface.
+
+if ROCKETALT_PROCESSING_BATMON
+menu "Battery monitor"
+	
+config ROCKETALT_BATMON_VOLTAGE_QLEN
+	int "Battery measurement queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering battery measurements.
+
+config ROCKETALT_BATMON_ADCPATH
+	string "ADC device path"
+	default "/dev/adc0"
+	---help---
+		The path to the ADC device where battery voltage can be read.
+
+config ROCKETALT_BATMON_ADCRESOLUTION
+	int "ADC resolution (bits)"
+	---help---
+		The ADC's resolution in bits.
+
+config ROCKETALT_BATMON_BATMAX
+	int "Battery max voltage (mV)"
+	---help---
+		The battery's maximum voltage in millivolts.
+
+endmenu # Battery monitor
+endif # ROCKETALT_PROCESSING_BATMON
 
 endif # ROCKETALT_PROCESSING

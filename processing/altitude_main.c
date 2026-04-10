@@ -163,7 +163,7 @@ int main(int argc, char **argv)
 
   alt_fd =
       orb_advertise_multi_queue(ORB_ID(fusion_altitude), NULL, NULL,
-                                CONFIG_ROCKETALT_PROCESSING_ALTFUSION_QLEN);
+                                CONFIG_ROCKETALT_ALTFUSION_QLEN);
   if (alt_fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
@@ -177,7 +177,7 @@ int main(int argc, char **argv)
 
   height_fd = orb_advertise_multi_queue(
       ORB_ID(fusion_height), NULL, NULL,
-      CONFIG_ROCKETALT_PROCESSING_HEIGHTFUSION_QLEN);
+      CONFIG_ROCKETALT_HEIGHTFUSION_QLEN);
 
   if (height_fd < 0)
     {
