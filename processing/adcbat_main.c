@@ -37,7 +37,7 @@ static const char sensor_voltage_format[] =
     "sensor_voltage - timestamp:%" PRIu64 ",voltage:%hf";
 #endif
 
-/* Definition for altitude topic */
+/* Definition for voltage topic */
 
 ORB_DEFINE(sensor_voltage, struct sensor_voltage, sensor_voltage_format);
 

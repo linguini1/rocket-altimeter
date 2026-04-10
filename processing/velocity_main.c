@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 
   vel_fd =
       orb_advertise_multi_queue(ORB_ID(sensor_velocity), NULL, NULL,
-                                CONFIG_ROCKETALT_PROCESSING_VELFUSION_QLEN);
+                                CONFIG_ROCKETALT_VELFUSION_QLEN);
   if (vel_fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
