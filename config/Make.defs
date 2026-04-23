@@ -1,0 +1,3 @@
+ifneq ($(CONFIG_ROCKETALT_CONF),)
+CONFIGURED_APPS += $(APPDIR)/rocket-altimeter/config
+endif

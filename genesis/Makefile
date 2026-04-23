@@ -1,0 +1,12 @@
+include $(APPDIR)/Make.defs
+
+MODULE    = $(CONFIG_ROCKETALT_GENESIS)
+PRIORITY  = $(CONFIG_ROCKETALT_GENESIS_PRIORITY)
+STACKSIZE = $(CONFIG_ROCKETALT_GENESIS_STACKSIZE)
+PROGNAME  = genesis
+
+# Source files
+
+MAINSRC = genesis_main.c
+
+include $(APPDIR)/Application.mk

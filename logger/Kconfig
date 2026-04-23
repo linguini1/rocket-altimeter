@@ -1,0 +1,30 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config ROCKETALT_LOGGER
+	bool "Data logging"
+	default n
+	depends on UORB
+	depends on USENSOR
+	---help---
+		Logs barometer and deployment event data
+
+if ROCKETALT_LOGGER
+
+comment "Program options"
+
+config ROCKETALT_LOGGER_PRIORITY
+	int "Priority"
+	default 100
+	---help---
+		The task priority for the logging program.
+
+config ROCKETALT_LOGGER_STACKSIZE
+	int "Stack size"
+	default 1024
+	---help---
+		The stack size for the logging program.
+
+endif # ROCKETALT_LOGGER

@@ -1,0 +1,28 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config ROCKETALT_CONF
+	bool "Configuration tool"
+	default n
+	---help---
+		Allows modification of the system-wide altimeter configuration file.
+
+if ROCKETALT_CONF
+
+comment "Program options"
+
+config ROCKETALT_CONF_PRIORITY
+	int "Priority"
+	default 100
+	---help---
+		The task priority for the logging program.
+
+config ROCKETALT_CONF_STACKSIZE
+	int "Stack size"
+	default 1024
+	---help---
+		The stack size for the logging program.
+
+endif # ROCKETALT_CONF
