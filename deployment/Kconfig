@@ -9,8 +9,8 @@ config ROCKETALT_DEPLOYMENT
 	depends on UORB
 	depends on USENSOR
 	---help---
-		Contains the implementation of a fake barometer to perform testing
-		without access to a real barometric pressure sensor.
+		Logic for triggering deployment of recovery systems based on flight
+		events and rocket altitude.
 
 if ROCKETALT_DEPLOYMENT
 

@@ -1,0 +1,12 @@
+include $(APPDIR)/Make.defs
+
+MODULE    = $(CONFIG_ROCKETALT_LOGGER)
+PRIORITY  = $(CONFIG_ROCKETALT_LOGGER_PRIORITY)
+STACKSIZE = $(CONFIG_ROCKETALT_LOGGER_STACKSIZE)
+PROGNAME  = logger
+
+# Source files
+
+MAINSRC  = logger_main.c
+
+include $(APPDIR)/Application.mk

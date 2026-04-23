@@ -15,4 +15,9 @@ PROGNAME += events_topic
 MAINSRC  += velocity_main.c
 PROGNAME += velocity_fusion
 
+ifeq ($(CONFIG_ROCKETALT_PROCESSING_BATMON),y)
+MAINSRC  += adcbat_main.c
+PROGNAME += adcbat
+endif
+
 include $(APPDIR)/Application.mk
