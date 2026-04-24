@@ -242,7 +242,7 @@ int main(int argc, char **argv)
 
     /* Start the logging process */
 
-#ifdef CONFIG_ROCKETALT_LOGGING
+#ifdef CONFIG_ROCKETALT_LOGGER
   err = start_process("logger", NULL, &pid);
   if (err != 0)
     {

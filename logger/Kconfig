@@ -27,4 +27,12 @@ config ROCKETALT_LOGGER_STACKSIZE
 	---help---
 		The stack size for the logging program.
 
+comment "General options"
+
+config ROCKETALT_LOGGER_LOGDIR
+	string "Default logging directory"
+	default "/data"
+	---help---
+		The default directory to write log files to.
+
 endif # ROCKETALT_LOGGER
