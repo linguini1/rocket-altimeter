@@ -28,7 +28,8 @@
 /* ADC measurement conversion */
 
 #define measure_to_volts(r)                                                  \
-  ((r) * ROCKETALT_BATMON_BATMAX / ROCKETALT_BATMON_ADCRESOLUTION)
+  ((r) * CONFIG_ROCKETALT_BATMON_BATMAX /                                    \
+   CONFIG_ROCKETALT_BATMON_ADCRESOLUTION)
 
 /* Optional debug output format string */
 
