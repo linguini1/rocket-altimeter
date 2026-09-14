@@ -8,10 +8,12 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <syslog.h>
 
 #include <nuttx/analog/adc.h>
+#include <nuttx/analog/ioctl.h>
 
 #include <uORB/uORB.h>
 
@@ -86,6 +88,17 @@ int main(int argc, char **argv)
 
   for (;;)
     {
+#ifdef CONFIG_ROCKETALT_BATMON_SWTRIG
+      /* Some ADCs need a conversion to be triggered manually. */
+
+      err = ioctl(adc_fd, ANIOC_TRIGGER, 0);
+      if (err < 0)
+        {
+          syslog(LOG_ERR | LOG_USER, "ADC trigger ioctl failed: %d\n", errno);
+          continue;
+        }
+#endif
+
       bread = read(adc_fd, &adc_data, sizeof(adc_data));
       if (bread <= 0)
         {
@@ -94,7 +107,7 @@ int main(int argc, char **argv)
         }
 
       volt.timestamp = orb_absolute_time();
-      volt.voltage = (float)measure_to_volts(adc_data.am_data);
+      volt.voltage = (float)measure_to_volts(adc_data.am_data) / 1000.0f;
 
       err = orb_publish(ORB_ID(sensor_voltage), bat_fd, &volt);
       if (err)
@@ -103,6 +116,14 @@ int main(int argc, char **argv)
                  errno);
           continue;
         }
+
+#ifdef CONFIG_ROCKETALT_BATMON_SWTRIG
+      /* If we're manually triggering the ADC, make sure we only do this as
+       * often as the user configured.
+       */
+
+      sleep(CONFIG_ROCKETALT_BATMON_PERIOD);
+#endif
     }
 
   orb_unadvertise(bat_fd);
