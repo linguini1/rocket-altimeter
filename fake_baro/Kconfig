@@ -24,7 +24,7 @@ config ROCKETALT_FAKE_BARO_PRIORITY
 
 config ROCKETALT_FAKE_BARO_STACKSIZE
 	int "Stack size"
-	default 1024
+	default 2048
 	---help---
 		The stack size for the fake_baro uORB topic.
 

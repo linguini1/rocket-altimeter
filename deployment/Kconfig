@@ -24,7 +24,7 @@ config ROCKETALT_DEPLOYMENT_PRIORITY
 
 config ROCKETALT_DEPLOYMENT_STACKSIZE
 	int "Stack size"
-	default 1024
+	default 2048
 	---help---
 		The stack size for the deployment program.
 

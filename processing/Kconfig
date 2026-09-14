@@ -24,7 +24,7 @@ config ROCKETALT_PROCESSING_PRIORITY
 
 config ROCKETALT_PROCESSING_STACKSIZE
 	int "Stack size"
-	default 1024
+	default 2048
 	---help---
 		The stack size for the processing uORB topics. These are small programs
 		which perform uORB operations.
