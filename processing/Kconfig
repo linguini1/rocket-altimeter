@@ -93,6 +93,24 @@ config ROCKETALT_BATMON_ADCPATH
 	---help---
 		The path to the ADC device where battery voltage can be read.
 
+config ROCKETALT_BATMON_SWTRIG
+	bool "ADC needs software trigger"
+	default n
+	---help---
+		Enable this if the ADC device needs to have measurements triggered by
+		software before they're available.
+
+if ROCKETALT_BATMON_SWTRIG
+
+config ROCKETALT_BATMON_PERIOD
+	int "Measurement period (s)"
+	default 10
+	---help---
+		Defines the measurement period for the battery monitor (how often an ADC
+		measurement will be taken).
+		
+endif # ROCKETALT_BATMON_SWTRIG
+
 config ROCKETALT_BATMON_ADCRESOLUTION
 	int "ADC resolution (bits)"
 	---help---
