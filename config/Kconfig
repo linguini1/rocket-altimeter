@@ -21,7 +21,7 @@ config ROCKETALT_CONF_PRIORITY
 
 config ROCKETALT_CONF_STACKSIZE
 	int "Stack size"
-	default 1024
+	default 2048
 	---help---
 		The stack size for the logging program.
 
