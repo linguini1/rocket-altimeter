@@ -21,6 +21,10 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* Program already knows about voltage data */
+
+ORB_DECLARE(sensor_voltage);
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -30,17 +34,6 @@
 #define measure_to_volts(r)                                                  \
   ((r) * CONFIG_ROCKETALT_BATMON_BATMAX /                                    \
    CONFIG_ROCKETALT_BATMON_ADCRESOLUTION)
-
-/* Optional debug output format string */
-
-#ifdef CONFIG_DEBUG_UORB
-static const char sensor_voltage_format[] =
-    "sensor_voltage - timestamp:%" PRIu64 ",voltage:%hf";
-#endif
-
-/* Definition for voltage topic */
-
-ORB_DEFINE(sensor_voltage, struct sensor_voltage, sensor_voltage_format);
 
 /****************************************************************************
  * Private Function Prototypes
