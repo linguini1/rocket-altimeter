@@ -116,7 +116,7 @@ int main(int argc, char **argv)
           },
       [DEP_IDX] =
           {
-              .fnamefmt = "deployment_%d.log",
+              .fnamefmt = "dep_%d.log",
               .xtraflags = O_SYNC, /* Sync always due to infrequent events */
               .orbbuf = &dep_event,
               .buflen = sizeof(dep_event),
@@ -124,7 +124,7 @@ int main(int argc, char **argv)
           },
       [FEVENT_IDX] =
           {
-              .fnamefmt = "flight_event_%d.log",
+              .fnamefmt = "f_event_%d.log",
               .xtraflags = O_SYNC, /* Sync always due to infrequent events */
               .orbbuf = &f_event,
               .buflen = sizeof(f_event),
