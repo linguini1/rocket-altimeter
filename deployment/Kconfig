@@ -30,6 +30,12 @@ config ROCKETALT_DEPLOYMENT_STACKSIZE
 
 comment "General options"
 
+config ROCKETALT_DEPLOYMENT_NUMCHANS
+	int "Number of deployment channels"
+	default 1
+	---help---
+		Configures the number of deployment channels that exist on the device.
+
 config ROCKETALT_DEPLOYMENT_QLEN
 	int "Queue length"
 	default 5

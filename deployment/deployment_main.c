@@ -9,9 +9,11 @@
 #include <poll.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <syslog.h>
 
+#include <nuttx/ioexpander/gpio.h>
 #include <nuttx/sensors/fakesensor.h>
 #include <nuttx/sensors/sensor.h>
 
@@ -47,17 +49,39 @@ union sensor_data
   struct flight_event event;
 };
 
+/* Conditions for deployment */
+
+enum depcond_e
+{
+  COND_APOGEE = 0x1, /* Deploy at apogee */
+  COND_ALT = 0x2,    /* Deploy at configured altitude, after apogee */
+  COND_TIME = 0x4,   /* Deploy using timer, after ascent */
+};
+
+/* Represents a pyro channel */
+
+struct pyrochan_s
+{
+  char *path;     /* Channel GPIO path */
+  int fd;         /* File descriptor to the channel GPIO */
+  int cond;       /* Deployment condition bitmask */
+  float altitude; /* Altitude in meters */
+  uint16_t time;  /* Deployment time in seconds (for timer) */
+  uint8_t id;     /* Channel ID */
+  bool fired;     /* Whether or not this channel has been deployed */
+};
+
+/****************************************************************************
+ * Private Function Prototypes
+ ****************************************************************************/
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
 
-static struct depconfig_s dummy_conf = {
-    .main_alt = 4000.0f,
-    .drogue_alt = 8000.0f,
-    .main_time = 18,
-    .drogue_time = 26,
-    .drogue_apogee = true,
-};
+/* Deployment channels */
+
+static struct pyrochan_s g_channels[CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS];
 
 /* Optional debug output format string */
 
@@ -71,40 +95,91 @@ static const char deploy_event_format[] =
 ORB_DEFINE(deploy_event, struct deploy_event, deploy_event_format);
 
 /****************************************************************************
- * Private Function Prototypes
- ****************************************************************************/
-
-/****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-static int deploy_main(void)
+/****************************************************************************
+ * Name: channel_deinit
+ *
+ * Description:
+ *   De-initializes a pyro channel.
+ *
+ * Input Parameters:
+ *   chan - The channel to de-initialize.
+ *
+ * Returned Value:
+ *   0 on success, negated errno on failure.
+ *
+ ****************************************************************************/
+
+static int channel_deinit(struct pyrochan_s *chan)
 {
-#ifdef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
-  syslog(LOG_INFO | LOG_USER, "Main deployed!\n");
-  return 0;
-#else
-  return 0; // TODO: gpio
-#endif /* CONFIG_ROCKETALT_DEPLOYMENT_MOCK */
+  int err = 0;
+
+  if (chan->fd > 0)
+    {
+      err = close(chan->fd);
+      chan->fd = -1;
+    }
+
+  return err;
 }
 
-static int deploy_drogue(void)
+/****************************************************************************
+ * Name: fire_channel
+ *
+ * Description:
+ *   Fires a deployment channel.
+ *
+ * Input Parameters:
+ *   chan - Deployment channel to fire.
+ *
+ * Returned Value:
+ *   0 on success, error code on failure.
+ *
+ ****************************************************************************/
+
+static int channel_fire(struct pyrochan_s *chan)
 {
-#ifdef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
-  syslog(LOG_INFO | LOG_USER, "Drogue deployed!\n");
+#ifndef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
+  int err;
+  bool fire = true;
+
+  err = ioctl(chan->fd, GPIOC_WRITE, &fire);
+  if (err < 0)
+    {
+      syslog(LOG_ERR | LOG_USER, "Couldn't fire channel %d: %d\n", chan->id,
+             errno);
+      return errno;
+    }
+
+    /* Channel fired successfully. TODO: turn it off again! */
+#endif
+
+  syslog(LOG_INFO | LOG_USER, "Fired channel %d!\n", chan->id);
+  chan->fired = true;
   return 0;
-#else
-  return 0; // TODO: gpio
-#endif /* CONFIG_ROCKETALT_DEPLOYMENT_MOCK */
 }
 
-static int publish_deployment(int fd, enum devent_e etype)
+/****************************************************************************
+ * Name: publish_deployment
+ *
+ * Description:
+ *   Publishes a deployment event.
+ *
+ * Input Parameters:
+ *   fd - The file descriptor of the topic to publish the event to.
+ *   id - The ID of the channel that was deployed.
+ *
+ * Returned Value:
+ *   0 on success, error code on failure.
+ *
+ ****************************************************************************/
+
+static int publish_deployment(int fd, uint8_t id)
 {
   int err;
-  struct deploy_event event = {
-      .event = etype,
-      .timestamp = orb_absolute_time(),
-  };
+  struct deploy_event event = {.timestamp = orb_absolute_time(), .id = id};
 
   err = orb_publish(ORB_ID(deploy_event), fd, &event);
   if (err)
@@ -129,6 +204,40 @@ int main(int argc, char **argv)
   bool drogue_deployed = false;
   bool main_deployed = false;
 
+  /* Initialize deployment channels */
+
+  for (int i = 0; i < array_len(g_channels); i++)
+    {
+      g_channels[i].fd = -1;
+      g_channels[i].id = i + 1;
+      g_channels[i].path = NULL;
+      g_channels[i].deployed = false;
+    }
+
+  /* Configure deployment channels TODO: do this dynamically */
+
+  g_channels[0].cond = COND_APOGEE;
+  g_channels[1].cond = COND_ALT;
+  g_channels[1].arg.altitude = 305.0f; /* 1000 ft */
+
+  /* Set up deployment channel file descriptors */
+
+  for (int i = 0; i < array_len(g_channels); i++)
+    {
+      /* Not opening a deployment channel should be considered fatal */
+
+      err = open(g_channels[i].path, O_RDWR);
+      if (err < 0)
+        {
+          syslog(LOG_ERR | LOG_USER, "Couldn't open %s: %d\n",
+                 g_channels[i].path, errno);
+          ret = EXIT_FAILURE;
+          goto clean_channels;
+        }
+
+      g_channels[i].fd = err; /* Store the opened fd */
+    }
+
   /* Set up flight event topic for publishing */
 
   dep_fd = orb_advertise_multi_queue(ORB_ID(deploy_event), NULL, NULL,
@@ -138,7 +247,7 @@ int main(int argc, char **argv)
       syslog(LOG_ERR | LOG_USER,
              "Could not advertise deploy_event topic: %d\n", errno);
       ret = EXIT_FAILURE;
-      return ret;
+      goto clean_channels;
     }
 
   syslog(LOG_INFO | LOG_USER, "deploy_event topic advertised.\n");
@@ -216,20 +325,36 @@ int main(int argc, char **argv)
 
       if (data[EVENT_IDX].event.event == FEVENT_ASCENT)
         {
-          if (dummy_conf.drogue_time != 0)
+          for (int i = 0; i < array_len(g_channels); i++)
             {
-              /* TODO: set up deployment timer(s) */
-            }
-
-          if (dummy_conf.main_time != 0)
-            {
-              /* TODO: set up deployment timer(s) */
+              if (g_channels[i].cond & COND_TIME)
+                {
+                  /* TODO: set up a timer for this channel's deployment */
+                }
             }
         }
 
-      /* If we have passed the altitude at which we should deploy main/drogue
-       * and the chute is configured for an altitude based deployment, deploy
-       * it.
+      /* If we have detected apogee, fire any channel which is meant to fire
+       * at apogee.
+       */
+
+      if (data[EVENT_IDX].event.event == FEVENT_APOGEE)
+        {
+          for (int i = 0; i < array_len(g_channels); i++)
+            {
+              if (g_channels[i].cond & COND_APOGEE)
+                {
+                  err = channel_fire(&g_channels[i]);
+                  if (err == 0)
+                    {
+                      publish_deployment(dep_fd, g_channels[i].id);
+                    }
+                }
+            }
+        }
+
+      /* If we are past apogee, we can deploy any channels that have an
+       * altitude limit above our current altitude.
        *
        * Only do this if we have detected apogee or descent. We don't want to
        * deploy if a pressure spike (like Mach dip) causes height to increase
@@ -240,83 +365,36 @@ int main(int argc, char **argv)
        * effectively checks for apogee or ascent.
        */
 
-      if (!main_deployed &&
-          data[HEIGHT_IDX].height.height <= dummy_conf.main_alt &&
-          data[EVENT_IDX].event.event >= FEVENT_APOGEE)
+      if (data[EVENT_IDX].event.event >= FEVENT_APOGEE)
         {
-          err = deploy_main();
-          if (err)
+          for (int i = 0; i < array_len(g_channels); i++)
             {
-              syslog(LOG_ERR | LOG_USER, "Couldn't deploy main: %d\n", err);
-            }
-          else
-            {
-              main_deployed = true;
-              publish_deployment(dep_fd, DEVENT_MAIN);
-#ifdef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
-              syslog(LOG_INFO | LOG_USER, "Deployed main at %.2f m\n",
-                     data[HEIGHT_IDX].height.height);
-#endif
-            }
-        }
-
-      if (dummy_conf.drogue_apogee)
-        {
-          /* If we have detected apogee, and the drogue is configured to
-           * deploy at apogee, deploy it.
-           */
-
-          if (!drogue_deployed &&
-              data[EVENT_IDX].event.event == FEVENT_APOGEE)
-            {
-              err = deploy_drogue();
-              if (err)
+              if (g_channels[i].cond & COND_ALT &&
+                  data[HEIGHT_IDX].height.height <= g_channels[i].altitude)
                 {
-                  syslog(LOG_ERR | LOG_USER, "Couldn't deploy drogue: %d\n",
-                         err);
-                }
-              else
-                {
-                  drogue_deployed = true;
-                  publish_deployment(dep_fd, DEVENT_DROGUE);
-#ifdef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
-                  syslog(LOG_INFO | LOG_USER, "Deployed drogue at %.2f m\n",
-                         data[HEIGHT_IDX].height.height);
-#endif
-                }
-            }
-        }
-      else
-        {
-          /* Drogue gets deployed at specific altitude */
-
-          if (!drogue_deployed &&
-              data[HEIGHT_IDX].height.height <= dummy_conf.drogue_alt &&
-              data[EVENT_IDX].event.event >= FEVENT_APOGEE)
-            {
-              err = deploy_drogue();
-              if (err)
-                {
-                  syslog(LOG_ERR | LOG_USER, "Couldn't deploy drogue: %d\n",
-                         err);
-                }
-              else
-                {
-                  drogue_deployed = true;
-                  publish_deployment(dep_fd, DEVENT_DROGUE);
-#ifdef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
-                  syslog(LOG_INFO | LOG_USER, "Deployed drogue at %.2f m\n",
-                         data[HEIGHT_IDX].height.height);
-#endif
+                  err = channel_fire(&g_channels[i]);
+                  if (err == 0)
+                    {
+                      publish_deployment(dep_fd, g_channels[i].id);
+                    }
                 }
             }
         }
     }
 
   orb_unsubscribe(fds[EVENT_IDX].fd);
+
 clean_height:
   orb_unsubscribe(fds[HEIGHT_IDX].fd);
+
 clean_dep:
   orb_unadvertise(dep_fd);
+
+clean_channels:
+  for (int i = 0; i < array_len(g_channels); i++)
+    {
+      channel_deinit(&g_channels[i]);
+    }
+
   return ret;
 }
