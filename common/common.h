@@ -55,16 +55,10 @@ struct flight_event
   enum fevent_e event; /* Flight event */
 };
 
-enum devent_e
-{
-  DEVENT_MAIN = 0,   /* Rocket is waiting for liftoff */
-  DEVENT_DROGUE = 1, /* Rocket is ascending */
-};
-
 struct deploy_event
 {
-  uint64_t timestamp;  /* Timestamp in microseconds */
-  enum devent_e event; /* Deployment event */
+  uint64_t timestamp; /* Timestamp in microseconds */
+  uint8_t id;         /* Deployment channel ID */
 };
 
 /* Deployment configuration options */
