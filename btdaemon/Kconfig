@@ -1,0 +1,33 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config ROCKETALT_BTDAEMON
+	bool "Bluetooth daemon"
+	default n
+	depends on UORB
+	depends on USENSOR
+	depends on NIMBLE
+	depends on WIRELESS_BLUETOOTH
+	---help---
+		Bluetooth daemon for publishing status over BLE and allowing device
+		configuration over Bluetooth.
+
+if ROCKETALT_BTDAEMON
+
+comment "Program options"
+
+config ROCKETALT_BTDAEMON_PRIORITY
+	int "Priority"
+	default 100
+	---help---
+		The task priority for the btdaemon program.
+
+config ROCKETALT_BTDAEMON_STACKSIZE
+	int "Stack size"
+	default 2048
+	---help---
+		The stack size for the btdaemon program.
+
+endif # ROCKETALT_BTDAEMON
