@@ -488,11 +488,23 @@ int main(int argc, char **argv)
   int err;
   int ret;
   int dep_fd;
-  int threadret;
+  void *threadret;
   union sigval cancelval;
   struct pollfd fds[2];
   union sensor_data data[2];
   g_thread_started = false; /* Initially not started */
+
+  /* Ensure that the number of arguments aligns with the number of GPIO device
+   * paths we're expecting.
+   */
+
+  if (argc < CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS + 1)
+    {
+      syslog(LOG_ERR | LOG_USER,
+             "Received %d possible paths, should have %d\n", argc,
+             CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS + 1);
+      return EXIT_FAILURE;
+    }
 
   /* Initialize deployment channels */
 
@@ -500,19 +512,20 @@ int main(int argc, char **argv)
     {
       g_channels[i].fd = -1;
       g_channels[i].id = i + 1;
-      g_channels[i].path = NULL;
+      g_channels[i].path = argv[i + 1];
       g_channels[i].fired = false;
+
+      syslog(LOG_USER | LOG_INFO, "Channel %d using %s\n", g_channels[i].id,
+             g_channels[i].path);
     }
 
   /* Configure deployment channels
    * TODO: do this dynamically from the configuration file.
    */
 
-  g_channels[0].path = "/dev/gpio1";
   g_channels[0].cond = COND_APOGEE | COND_TIME;
   g_channels[0].time = 10;
 
-  g_channels[1].path = "/dev/gpio2";
   g_channels[1].cond = COND_ALT | COND_TIME;
   g_channels[1].altitude = 305.0f; /* 1000 ft */
   g_channels[1].time = 20;
