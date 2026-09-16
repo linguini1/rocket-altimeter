@@ -727,7 +727,20 @@ clean_thread:
   if (g_thread_started)
     {
       cancelval.sival_ptr = NULL;
-      err = pthread_sigqueue(g_thread, SIGABRT, cancelval);
+
+      /* NOTE: NuttX has no `pthread_sigqueue` implementation. However, the
+       * `sigqueue` implementation is documented as taking a 'task ID' as the
+       * first argument. As far as I can tell, NuttX gives a unique task ID to
+       * each process AND thread. So it should be safe to use the pthread
+       * handle as a task ID here.
+       */
+
+#if 0
+      err = sigqueue(g_thread, SIGABRT, cancelval);
+#else
+      err = sigqueue(g_thread, SIGABRT, cancelval);
+#endif
+
       if (err)
         {
           syslog(LOG_ERR | LOG_USER,
@@ -746,7 +759,7 @@ clean_thread:
         }
 
       syslog(LOG_INFO | LOG_USER, "Timer thread exited with status %d\n",
-             threadret);
+             (int)threadret);
     }
 
 clean_channels:
