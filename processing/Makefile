@@ -20,4 +20,9 @@ MAINSRC  += adcbat_main.c
 PROGNAME += adcbat
 endif
 
+ifeq ($(CONFIG_ROCKETALT_PROCESSING_CONTMON),y)
+MAINSRC  += continuity_main.c
+PROGNAME += continuity
+endif
+
 include $(APPDIR)/Application.mk
