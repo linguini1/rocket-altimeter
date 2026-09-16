@@ -28,24 +28,14 @@
 
 #define US_TO_S (1e-06)
 
-/* Program already knows about altitude data */
+/* Program already knows about altitude and velocity data */
 
 ORB_DECLARE(fusion_altitude);
+ORB_DECLARE(sensor_velocity);
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
-/* Optional debug output format string */
-
-#ifdef CONFIG_DEBUG_UORB
-static const char sensor_velocity_format[] =
-    "sensor_velocity - timestamp:%" PRIu64 ",velocity:%hf";
-#endif
-
-/* Definition for altitude topic */
-
-ORB_DEFINE(sensor_velocity, struct sensor_velocity, sensor_velocity_format);
 
 /****************************************************************************
  * Private Function Prototypes
