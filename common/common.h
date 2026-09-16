@@ -18,6 +18,10 @@
 
 #define lp_filter(old, new, a) ((a) * (old) + (1.0 - (a)) * (new));
 
+/* Array length helper */
+
+#define array_len(arr) (sizeof(arr) / sizeof(arr[0]))
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/
@@ -34,10 +38,11 @@ struct fusion_height
   float height;       /* Height (from launch altitude) in meters */
 };
 
-struct sensor_voltage
+struct sensor_continuity
 {
   uint64_t timestamp; /* Timestamp in microseconds */
-  float voltage;      /* Voltage (Volts) */
+  uint8_t id;         /* Channel ID associated with the measurement */
+  uint8_t continuous; /* Continuous (0 no, 1 yes) */
 };
 
 enum fevent_e
