@@ -54,9 +54,22 @@ int main(int argc, char **argv)
   int err;
   int bat_fd;
   int adc_fd;
+  uint8_t channo;
   ssize_t bread;
   struct adc_msg_s adc_data;
   struct sensor_voltage volt;
+
+  /* Ensure we have sufficient arguments for the ADC */
+
+  if (argc < 3)
+    {
+      syslog(LOG_ERR | LOG_USER,
+             "Program must be started with first argument as ADC device "
+             "path, second argument ADC channo.\n");
+      return EXIT_FAILURE;
+    }
+
+  channo = atoi(argv[2]); /* Parse channel number */
 
   /* Set up battery topic for publishing */
 
@@ -73,13 +86,11 @@ int main(int argc, char **argv)
 
   /* Open ADC device */
 
-  adc_fd = open(CONFIG_ROCKETALT_BATMON_ADCPATH, O_RDONLY);
+  adc_fd = open(argv[1], O_RDONLY);
   if (adc_fd < 0)
     {
-      syslog(LOG_ERR | LOG_USER,
-             "Could not open ADC device '" CONFIG_ROCKETALT_BATMON_ADCPATH
-             "' %d\n",
-             errno);
+      syslog(LOG_ERR | LOG_USER, "Could not open ADC device %s: %d\n",
+             argv[1], errno);
       orb_unadvertise(bat_fd);
       return EXIT_FAILURE;
     }
@@ -98,6 +109,8 @@ int main(int argc, char **argv)
           continue;
         }
 #endif
+
+      /* TODO: Need read to respect `channo` */
 
       bread = read(adc_fd, &adc_data, sizeof(adc_data));
       if (bread <= 0)

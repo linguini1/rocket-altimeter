@@ -87,12 +87,6 @@ config ROCKETALT_BATMON_VOLTAGE_QLEN
 	---help---
 		The length of the queue to use for buffering battery measurements.
 
-config ROCKETALT_BATMON_ADCPATH
-	string "ADC device path"
-	default "/dev/adc0"
-	---help---
-		The path to the ADC device where battery voltage can be read.
-
 config ROCKETALT_BATMON_SWTRIG
 	bool "ADC needs software trigger"
 	default n
