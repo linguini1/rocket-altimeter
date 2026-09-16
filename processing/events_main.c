@@ -57,10 +57,6 @@
 
 #define APOGEE_PERCENTAGE (0.8f)
 
-/* Array length helper */
-
-#define array_len(arr) (sizeof(arr) / sizeof(arr[0]))
-
 /* Indices into arrays needed for height and velocity data */
 
 #define HEIGHT_IDX (0)

@@ -27,10 +27,6 @@
 #define DEP_IDX (1)
 #define FEVENT_IDX (2)
 
-/* Array length helper */
-
-#define array_len(arr) (sizeof(arr) / sizeof(arr[0]))
-
 /* Program already knows about necessary uORB data types */
 
 ORB_DECLARE(sensor_baro);
