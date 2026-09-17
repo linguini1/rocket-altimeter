@@ -7,6 +7,16 @@ PROGNAME  = fake_baro
 
 # Source files
 
-MAINSRC  = fake_baro_main.c
+ifeq ($(CONFIG_ROCKETALT_FAKE_BARO_USECSV),y)
+MAINSRC  = fake_baro_csv_main.c
+endif
+
+ifeq ($(CONFIG_ROCKETALT_FAKE_BARO_USEBLE),y)
+MAINSRC  = fake_baro_ble_main.c
+endif
+
+ifeq ($(CONFIG_ROCKETALT_FAKE_BARO_USECURVE),y)
+MAINSRC  = fake_baro_curve_main.c
+endif
 
 include $(APPDIR)/Application.mk
