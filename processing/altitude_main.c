@@ -4,7 +4,9 @@
 
 #include <nuttx/config.h>
 
+#include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <math.h>
 #include <poll.h>
 #include <stdint.h>
@@ -40,6 +42,23 @@
 
 #define CELSIUS_TO_KELVIN (273.0f)
 
+/* Topic indexes */
+
+#define ALT_IDX (0)
+#define HEIGHT_IDX (1)
+
+/****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
+struct topic_s
+{
+  int fd;                          /* File descriptor to publish to */
+  int qlen;                        /* Length of topic queue */
+  int devno;                       /* Device number of topic instance */
+  const struct orb_metadata *meta; /* Topic metadata */
+};
+
 /* Program already knows about barometer data */
 
 ORB_DECLARE(sensor_baro);
@@ -62,6 +81,23 @@ static const char fusion_height_format[] =
 
 ORB_DEFINE(fusion_altitude, struct fusion_altitude, fusion_altitude_format);
 ORB_DEFINE(fusion_height, struct fusion_height, fusion_height_format);
+
+/* uORB topics we publish */
+
+static struct topic_s g_topics[] = {
+    [ALT_IDX] =
+        {
+            .fd = -1,
+            .meta = ORB_ID(fusion_altitude),
+            .qlen = CONFIG_ROCKETALT_ALTFUSION_QLEN,
+        },
+    [HEIGHT_IDX] =
+        {
+            .fd = -1,
+            .meta = ORB_ID(fusion_height),
+            .qlen = CONFIG_ROCKETALT_HEIGHTFUSION_QLEN,
+        },
+};
 
 /****************************************************************************
  * Private Function Prototypes
@@ -112,8 +148,22 @@ static struct fusion_height height_from_alt(struct fusion_altitude *launch,
 {
   return (struct fusion_height){
       .timestamp = cur->timestamp,
-      .height = (cur->altitude - launch->altitude),
+      .height = cur->altitude - launch->altitude,
   };
+}
+
+static int publish_to_topic(const struct topic_s *topic, void *data)
+{
+  int err;
+
+  err = orb_publish(topic->meta, topic->fd, data);
+  if (err)
+    {
+      syslog(LOG_ERR | LOG_USER, "Couldn't publish to %s%d: %d\n",
+             topic->meta->o_name, topic->devno, errno);
+    }
+
+  return err;
 }
 
 /****************************************************************************
@@ -124,76 +174,70 @@ int main(int argc, char **argv)
 {
   int ret;
   int err;
-  int alt_fd;
-  int height_fd;
-  int baro_fd;
-  unsigned baro_instance = 0;
+  int c;
+  int devno = 0;
+  int baro_instance = 0;
   struct sensor_baro baro_data;
   struct fusion_altitude cur_alt;
   struct fusion_altitude launch_alt;
   struct fusion_height height;
-  float prevheight = 0.0f;
   struct pollfd pfd;
 
-  /* Get which barometer instance should be used if one is provided.
-   * NOTE: assumes that first argument is always the baro instance to use.
-   * TODO: allow other parameters to be chosen?
-   */
-
-  if (argc > 1)
+  while ((c = getopt(argc, argv, ":n:b:")) != -1)
     {
-      errno = 0;
-      baro_instance = strtoul(argv[1], NULL, 10);
-
-      /* There was a conversion error */
-
-      if (errno)
+      switch (c)
         {
-          syslog(LOG_ERR | LOG_USER, "'%s' is not a valid number.\n",
-                 argv[1]);
+        case 'n':
+          devno = atoi(optarg);
+          break;
+
+        case 'b':
+          baro_instance = atoi(optarg);
+          break;
+
+        case ':':
+          syslog(LOG_ERR | LOG_USER, "Option -%c requires an argument.\n",
+                 optopt);
+          return EXIT_FAILURE;
+
+        case '?':
+          syslog(LOG_ERR | LOG_USER, "Unknown option '-%c'.\n", optopt);
+          break; /* Don't exit, parse other options */
+
+        default:
+          syslog(LOG_ERR | LOG_USER, "Usage: altitude_fusion [-n devno]\n");
           return EXIT_FAILURE;
         }
     }
 
-  /* Set up altitude fusion topic for publishing */
+  /* Set up topics for publishing */
 
-  alt_fd =
-      orb_advertise_multi_queue(ORB_ID(fusion_altitude), NULL, NULL,
-                                CONFIG_ROCKETALT_ALTFUSION_QLEN);
-  if (alt_fd < 0)
+  for (int i = 0; i < array_len(g_topics); i++)
     {
-      syslog(LOG_ERR | LOG_USER,
-             "Could not advertise fusion_altitude topic: %d\n", errno);
-      return EXIT_FAILURE;
+      g_topics[i].devno = devno;
+      g_topics[i].fd = orb_advertise_multi_queue(g_topics[i].meta, NULL,
+                                                 &devno, g_topics[i].qlen);
+      if (g_topics[i].fd < 0)
+        {
+          syslog(LOG_ERR | LOG_USER, "Could not advertise %s%d: %d\n",
+                 g_topics[i].meta->o_name, g_topics[i].devno, errno);
+          ret = EXIT_FAILURE;
+          goto cleanup_topics;
+        }
+
+      syslog(LOG_INFO | LOG_USER, "%s%d advertised\n",
+             g_topics[i].meta->o_name, g_topics[i].devno);
     }
-
-  syslog(LOG_INFO | LOG_USER, "fusion_altitude topic advertised.\n");
-
-  /* Set up height fusion topic for publishing */
-
-  height_fd = orb_advertise_multi_queue(
-      ORB_ID(fusion_height), NULL, NULL,
-      CONFIG_ROCKETALT_HEIGHTFUSION_QLEN);
-
-  if (height_fd < 0)
-    {
-      syslog(LOG_ERR | LOG_USER,
-             "Could not advertise fusion_height topic: %d\n", errno);
-      ret = EXIT_FAILURE;
-      goto cleanup_alt;
-    }
-
-  syslog(LOG_INFO | LOG_USER, "fusion_height topic advertised.\n");
 
   /* Subscribe to barometer topic of correct instance */
 
-  baro_fd = orb_subscribe_multi(ORB_ID(sensor_baro), baro_instance);
-  if (baro_fd < 0)
+  pfd.fd = orb_subscribe_multi(ORB_ID(sensor_baro), baro_instance);
+  if (pfd.fd < 0)
     {
       syslog(LOG_ERR | LOG_USER, "Could not subscribe to sensor_baro%d: %d\n",
              baro_instance, errno);
       ret = EXIT_FAILURE;
-      goto cleanup_height;
+      goto cleanup_topics;
     }
 
   /* Set our launch height to zero to indicate that we haven't recorded it
@@ -204,7 +248,6 @@ int main(int argc, char **argv)
 
   /* Set up polling */
 
-  pfd.fd = baro_fd;
   pfd.events = POLLIN;
   pfd.revents = 0;
 
@@ -219,7 +262,7 @@ int main(int argc, char **argv)
           continue; /* Try again */
         }
 
-      err = orb_copy(ORB_ID(sensor_baro), baro_fd, &baro_data);
+      err = orb_copy(ORB_ID(sensor_baro), pfd.fd, &baro_data);
       if (err)
         {
           if (errno != ENODATA)
@@ -241,30 +284,23 @@ int main(int argc, char **argv)
 
       /* Publish raw altitude data */
 
-      err = orb_publish(ORB_ID(fusion_altitude), alt_fd, &cur_alt);
-      if (err)
-        {
-          syslog(LOG_ERR | LOG_USER, "Couldn't publish altitude data: %d\n",
-                 errno);
-          continue;
-        }
+      publish_to_topic(&g_topics[ALT_IDX], &cur_alt);
 
       /* Publish our computed height */
 
       height = height_from_alt(&launch_alt, &cur_alt);
-      err = orb_publish(ORB_ID(fusion_height), height_fd, &height);
-      if (err)
+      publish_to_topic(&g_topics[HEIGHT_IDX], &height);
+    }
+
+cleanup_topics:
+  for (int i = 0; i < array_len(g_topics); i++)
+    {
+      if (g_topics[i].fd < 0)
         {
-          syslog(LOG_ERR | LOG_USER, "Couldn't publish height data: %d\n",
-                 errno);
-          continue;
+          orb_unadvertise(g_topics[i].fd);
         }
     }
 
-  orb_unsubscribe(baro_fd);
-cleanup_height:
-  orb_unadvertise(height_fd);
-cleanup_alt:
-  orb_unadvertise(alt_fd);
+  orb_unsubscribe(pfd.fd);
   return ret;
 }
