@@ -81,7 +81,7 @@ union sensor_data
 struct topic_s
 {
   int devno;
-  struct orb_metadata *meta;
+  const struct orb_metadata *meta;
 };
 
 /****************************************************************************
