@@ -259,7 +259,7 @@ int main(int argc, char **argv)
       height.height = lp_filter(prevheight, height.height, LP_ALPHA);
       prevheight = height.height;
 
-      orb_publish(ORB_ID(fusion_height), height_fd, &height);
+      err = orb_publish(ORB_ID(fusion_height), height_fd, &height);
       if (err)
         {
           syslog(LOG_ERR | LOG_USER, "Couldn't publish height data: %d\n",
