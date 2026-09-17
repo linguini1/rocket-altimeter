@@ -237,6 +237,8 @@ static int channel_deinit(struct pyrochan_s *chan)
 
 static int channel_fire(struct pyrochan_s *chan)
 {
+  if (chan->fired) return 0; /* We've already fired this channel! */
+
 #ifndef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
   int err;
 
