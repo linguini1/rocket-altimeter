@@ -377,8 +377,10 @@ int main(int argc, char **argv)
 
           current = event.event;
 #ifdef CONFIG_ROCKETALT_EVENT_SYSLOG
-          syslog(LOG_INFO | LOG_USER, "Flight event: %s\n",
-                 FEVENT_STR[event.event]);
+          syslog(LOG_INFO | LOG_USER,
+                 "Flight event: %s @ height=%.2f m, vel=%.2f m/s\n",
+                 FEVENT_STR[event.event], g_data[HEIGHT_IDX].height.height,
+                 g_data[VEL_IDX].vel.velocity);
 #endif
         }
     }
