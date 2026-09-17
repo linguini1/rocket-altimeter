@@ -37,21 +37,29 @@ config ROCKETALT_FAKE_BARO_QLEN
 		How many barometer measurements can be stored in the queue buffer at
 		once while publishing data.
 
+choice
+	prompt "Fake barometer implementation"
+	default ROCKETALT_FAKE_BARO_USECSV
+
 config ROCKETALT_FAKE_BARO_USECSV
-	bool "Publish fake data from CSV file"
+	bool "Fake data from CSV file"
 	depends on SENSORS_FAKESENSOR
-	default y
 	---help---
 		Implementation of the fake barometer using a CSV file from which data
 		can be read and published.
 
-if ROCKETALT_FAKE_BARO_USECSV
-
-config ROCKETALT_FAKE_BARO_CSVPATH
-	string "CSV file path"
+config ROCKETALT_FAKE_BARO_USEBLE
+	bool "Fake data from Bluetooth"
 	---help---
-		The path to the CSV file to use for barometer data.
+		Implementation of the fake barometer using a Bluetooth service to
+		recieve and publish barometer data from some other device.
 
-endif # ROCKETALT_FAKE_BARO_USECSV
+config ROCKETALT_FAKE_BARO_USECURVE
+	bool "Fake data from a curve"
+	---help---
+		Implementation of the fake barometer using a pre-defined mathematical
+		curve to generate fake barometer data.
+	
+endchoice
 
 endif # ROCKETALT_FAKE_BARO
