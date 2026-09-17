@@ -72,6 +72,7 @@ struct pyrochan_s
   float altitude;  /* Altitude in meters */
   uint16_t time;   /* Deployment time in seconds (for timer) */
   uint8_t id;      /* Channel ID */
+  bool t_started;  /* True if the timer for this channel has been started */
   bool fired;      /* Whether or not this channel has been deployed */
 };
 
@@ -187,6 +188,7 @@ static int channel_start_timer(struct pyrochan_s *chan)
       return err;
     }
 
+  chan->t_started = true;
   syslog(LOG_INFO | LOG_USER, "Started %us timer for channel %d\n",
          chan->time, chan->id);
   return err;
@@ -510,6 +512,7 @@ int main(int argc, char **argv)
       g_channels[i].id = i + 1;
       g_channels[i].path = argv[i + 1];
       g_channels[i].fired = false;
+      g_channels[i].t_started = false;
 
       syslog(LOG_USER | LOG_INFO, "Channel %d using %s\n", g_channels[i].id,
              g_channels[i].path);
@@ -651,7 +654,8 @@ int main(int argc, char **argv)
         {
           for (int i = 0; i < array_len(g_channels); i++)
             {
-              if (g_channels[i].cond & COND_TIME)
+              if ((g_channels[i].cond & COND_TIME) &&
+                  !g_channels[i].t_started)
                 {
                   err = channel_start_timer(&g_channels[i]);
 
