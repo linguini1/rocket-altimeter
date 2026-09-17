@@ -25,7 +25,7 @@
 
 /* Zero velocity detection in m/s */
 
-#define ZERO_VEL_TOL (0.8f)
+#define ZERO_VEL_TOL (3.0f)
 
 #define is_zero(vel, tol) ((vel) <= (tol) && (vel) >= -(tol))
 
@@ -52,11 +52,17 @@
 
 /* Number of velocity measurements to average */
 
-#define NUMVEL_SAMPLES (10)
+#define NUMVEL_SAMPLES (8)
 
 /* Percentage of apogee reached to detect apogee */
 
 #define APOGEE_PERCENTAGE (0.8f)
+
+/* Determine if the altitude is within the apogee window.
+ * We can be `APOGEE_PERCENTAGE` or greater of `apo` to be in the window.
+ */
+
+#define in_apogee_window(alt, apo) ((alt) >= APOGEE_PERCENTAGE * (apo))
 
 /* Indices into arrays needed for height and velocity data */
 
@@ -146,32 +152,33 @@ static struct topic_s g_topics[2] = {
 static void update_avg_vel(float new)
 {
   float old;
+  unsigned num_measures;
+
   if (circbuf_is_full(&g_velocities))
     {
       /* Remove old value from calculation and add new value */
 
       circbuf_read(&g_velocities, &old, sizeof(old));
       circbuf_write(&g_velocities, &new, sizeof(new));
-      g_avg_vel -= (old / (float)NUMVEL_SAMPLES);
-      g_avg_vel += (new / (float)NUMVEL_SAMPLES);
+      num_measures = NUMVEL_SAMPLES;
     }
   else
     {
       /* Store the new velocity */
 
       circbuf_write(&g_velocities, &new, sizeof(new));
-
-      /* Compute average velocity based off current samples only. This path
-       * only happens for the first `NUMVEL_SAMPLES`.
-       */
-
-      g_avg_vel = 0.0f;
-      unsigned num_measures = circbuf_used(&g_velocities) / sizeof(float);
-      for (unsigned i = 0; i < num_measures; i++)
-        {
-          g_avg_vel += (g_velbuf[i] / (float)num_measures);
-        }
+      num_measures = circbuf_used(&g_velocities) / sizeof(float);
     }
+
+  /* Compute average velocity based off current samples only */
+
+  g_avg_vel = 0.0f;
+  for (unsigned i = 0; i < num_measures; i++)
+    {
+      g_avg_vel += g_velbuf[i];
+    }
+
+  g_avg_vel /= (float)num_measures;
 }
 
 /****************************************************************************
@@ -213,13 +220,14 @@ int main(int argc, char **argv)
           goto clean_fds;
         }
 
+      syslog(LOG_INFO | LOG_USER, "Event topic subscribed to %s%d.\n",
+             g_topics[i].meta->o_name, g_topics[i].devno);
+
       /* Initialize polling fields */
 
       g_fds[i].events = POLLIN;
       g_fds[i].revents = 0;
     }
-
-  syslog(LOG_INFO | LOG_USER, "Event topic subscribed to inputs.\n");
 
   /* Give an initial value to our data that is consistent with
    * FEVENT_GROUNDED so we don't compute a crazy event. Zero velocity
@@ -304,8 +312,8 @@ int main(int argc, char **argv)
            * the predicted apogee, then we have reached apogee!
            */
 
-          if (g_data[HEIGHT_IDX].height.height >=
-                  APOGEE_PERCENTAGE * dummy_config.pred_apogee &&
+          if (in_apogee_window(g_data[HEIGHT_IDX].height.height,
+                               dummy_config.pred_apogee) &&
               is_zero(g_avg_vel, ZERO_VEL_TOL) &&
               is_zero(g_data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {
