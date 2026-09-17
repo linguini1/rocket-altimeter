@@ -20,10 +20,6 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-/* Low pass filter alpha for height */
-
-#define LP_ALPHA (0.98)
-
 /* Pressure at sea-level in millibars */
 
 #define SEA_PRESSURE (1013.25f)
@@ -256,9 +252,6 @@ int main(int argc, char **argv)
       /* Publish our computed height */
 
       height = height_from_alt(&launch_alt, &cur_alt);
-      height.height = lp_filter(prevheight, height.height, LP_ALPHA);
-      prevheight = height.height;
-
       err = orb_publish(ORB_ID(fusion_height), height_fd, &height);
       if (err)
         {
