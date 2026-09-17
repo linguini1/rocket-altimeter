@@ -89,7 +89,7 @@ struct topic_s
  ****************************************************************************/
 
 static struct processconfig_s dummy_config = {
-    .pred_apogee = 8000.0f,
+    .pred_apogee = 10000.0f, /* Matches default of fake barometer curve */
 };
 
 /* Optional debug output format string */
