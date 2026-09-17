@@ -4,6 +4,7 @@
 
 #include <nuttx/config.h>
 
+#include <errno.h>
 #include <fcntl.h>
 #include <math.h>
 #include <poll.h>
@@ -77,6 +78,12 @@ union sensor_data
   struct sensor_velocity vel;
 };
 
+struct topic_s
+{
+  int devno;
+  struct orb_metadata *meta;
+};
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -108,10 +115,25 @@ static const char *FEVENT_STR[] = {
 
 /* Buffer for averaging velocity */
 
-static float velbuf[NUMVEL_SAMPLES];
-static struct circbuf_s velocities =
-    CIRCBUF_INITIALIZER(velbuf, sizeof(velbuf));
+static float g_velbuf[NUMVEL_SAMPLES];
+static struct circbuf_s g_velocities =
+    CIRCBUF_INITIALIZER(g_velbuf, sizeof(g_velbuf));
 static float g_avg_vel;
+
+/* Data buffer for reading measurements */
+
+static union sensor_data g_data[2];
+
+/* Polling structure for polling files */
+
+static struct pollfd g_fds[2];
+
+/* Array of topics we're subscribed to */
+
+static struct topic_s g_topics[2] = {
+    [HEIGHT_IDX] = {.devno = 0, .meta = ORB_ID(fusion_height)},
+    [VEL_IDX] = {.devno = 0, .meta = ORB_ID(sensor_velocity)},
+};
 
 /****************************************************************************
  * Private Function Prototypes
@@ -124,26 +146,30 @@ static float g_avg_vel;
 static void update_avg_vel(float new)
 {
   float old;
-  if (circbuf_is_full(&velocities))
+  if (circbuf_is_full(&g_velocities))
     {
       /* Remove old value from calculation and add new value */
 
-      circbuf_read(&velocities, &old, sizeof(old));
-      circbuf_write(&velocities, &new, sizeof(old));
+      circbuf_read(&g_velocities, &old, sizeof(old));
+      circbuf_write(&g_velocities, &new, sizeof(new));
       g_avg_vel -= (old / (float)NUMVEL_SAMPLES);
       g_avg_vel += (new / (float)NUMVEL_SAMPLES);
     }
   else
     {
+      /* Store the new velocity */
+
+      circbuf_write(&g_velocities, &new, sizeof(new));
+
       /* Compute average velocity based off current samples only. This path
        * only happens for the first `NUMVEL_SAMPLES`.
        */
 
       g_avg_vel = 0.0f;
-      unsigned num_measures = circbuf_used(&velocities) / sizeof(float);
+      unsigned num_measures = circbuf_used(&g_velocities) / sizeof(float);
       for (unsigned i = 0; i < num_measures; i++)
         {
-          g_avg_vel += (velbuf[i] / (float)num_measures);
+          g_avg_vel += (g_velbuf[i] / (float)num_measures);
         }
     }
 }
@@ -156,19 +182,14 @@ int main(int argc, char **argv)
 {
   int err;
   int ret;
-  int vel_fd;
-  int height_fd;
   int event_fd;
-  union sensor_data data[2];
-  struct pollfd fds[2];
   struct flight_event event;
   enum fevent_e current = FEVENT_GROUNDED;
 
   /* Set up flight event topic for publishing */
 
-  event_fd =
-      orb_advertise_multi_queue(ORB_ID(flight_event), NULL, NULL,
-                                CONFIG_ROCKETALT_EVENT_QLEN);
+  event_fd = orb_advertise_multi_queue(ORB_ID(flight_event), NULL, NULL,
+                                       CONFIG_ROCKETALT_EVENT_QLEN);
   if (event_fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
@@ -179,44 +200,34 @@ int main(int argc, char **argv)
 
   syslog(LOG_INFO | LOG_USER, "flight_event topic advertised.\n");
 
-  /* Subscribe to height topic */
+  /* Subscribe to uORB topics */
 
-  height_fd = orb_subscribe_multi(ORB_ID(fusion_height), 0);
-  if (height_fd < 0)
+  for (int i = 0; i < array_len(g_topics); i++)
     {
-      syslog(LOG_ERR | LOG_USER,
-             "Could not subscribe to fusion_height0: %d\n", errno);
-      ret = EXIT_FAILURE;
-      goto clean_eventonly;
+      g_fds[i].fd = orb_subscribe_multi(g_topics[i].meta, g_topics[i].devno);
+      if (g_fds[i].fd < 0)
+        {
+          syslog(LOG_ERR | LOG_USER, "Could not subscribe to %s%d: %d\n",
+                 g_topics[i].meta->o_name, g_topics[i].devno, errno);
+          ret = EXIT_FAILURE;
+          goto clean_fds;
+        }
+
+      /* Initialize polling fields */
+
+      g_fds[i].events = POLLIN;
+      g_fds[i].revents = 0;
     }
 
-  /* Subscribe to velocity topic */
-
-  vel_fd = orb_subscribe_multi(ORB_ID(sensor_velocity), 0);
-  if (vel_fd < 0)
-    {
-      syslog(LOG_ERR | LOG_USER,
-             "Could not subscribe to sensor_velocity0: %d\n", errno);
-      ret = EXIT_FAILURE;
-      goto clean_alt;
-    }
-
-  /* Create our polling structure */
-
-  fds[HEIGHT_IDX].fd = height_fd;
-  fds[HEIGHT_IDX].events = POLLIN;
-  fds[HEIGHT_IDX].revents = 0;
-
-  fds[VEL_IDX].fd = vel_fd;
-  fds[VEL_IDX].events = POLLIN;
-  fds[VEL_IDX].revents = 0;
+  syslog(LOG_INFO | LOG_USER, "Event topic subscribed to inputs.\n");
 
   /* Give an initial value to our data that is consistent with
    * FEVENT_GROUNDED so we don't compute a crazy event. Zero velocity
    * and zero height is reasonable for this.
    */
 
-  memset(data, 0, sizeof(data));
+  g_data[HEIGHT_IDX].height.height = 0.0f;
+  g_data[VEL_IDX].vel.velocity = 0.0f;
 
   /* Forever try to detect events */
 
@@ -224,7 +235,7 @@ int main(int argc, char **argv)
     {
       /* Poll to read some height and velocity data */
 
-      err = poll(fds, array_len(fds), -1);
+      err = poll(g_fds, array_len(g_fds), -1);
       if (err <= 0)
         {
           syslog(LOG_ERR | LOG_USER, "Failed to poll: %d\n", errno);
@@ -233,18 +244,36 @@ int main(int argc, char **argv)
 
       /* We have some data, read it in! */
 
-      for (unsigned i = 0; i < array_len(fds); i++)
+      for (unsigned i = 0; i < array_len(g_fds); i++)
         {
-          if (fds[i].revents & POLLIN)
+          if (g_fds[i].revents & POLLIN)
             {
-              orb_copy_multi(fds[i].fd, &data[i], sizeof(union sensor_data));
-              fds[i].revents = 0; /* Clear events */
+              g_fds[i].revents = 0; /* Clear events */
 
               /* Update our average velocity */
 
+              switch (i)
+                {
+                case HEIGHT_IDX:
+                  err = orb_copy_multi(g_fds[i].fd, &g_data[i].height,
+                                       g_topics[i].meta->o_size);
+                  break;
+                case VEL_IDX:
+                  err = orb_copy_multi(g_fds[i].fd, &g_data[i].vel,
+                                       g_topics[i].meta->o_size);
+                  break;
+                }
+
+              if (err < 0)
+                {
+                  syslog(LOG_ERR | LOG_USER, "Couldn't read %s%d: %d\n",
+                         g_topics[i].meta->o_name, g_topics[i].devno, errno);
+                  continue; /* Try the next topic */
+                }
+
               if (i == VEL_IDX)
                 {
-                  update_avg_vel(data[i].vel.velocity);
+                  update_avg_vel(g_data[i].vel.velocity);
                 }
             }
         }
@@ -260,8 +289,8 @@ int main(int argc, char **argv)
            * high, we are now going up.
            */
 
-          if (data[HEIGHT_IDX].height.height >= MIN_TAKEOFF_ALT &&
-              data[VEL_IDX].vel.velocity >= MIN_TAKEOFF_VEL)
+          if (g_data[HEIGHT_IDX].height.height >= MIN_TAKEOFF_ALT &&
+              g_data[VEL_IDX].vel.velocity >= MIN_TAKEOFF_VEL)
             {
               event.event = FEVENT_ASCENT;
               event.timestamp = orb_absolute_time();
@@ -275,10 +304,10 @@ int main(int argc, char **argv)
            * the predicted apogee, then we have reached apogee!
            */
 
-          if (data[HEIGHT_IDX].height.height >=
+          if (g_data[HEIGHT_IDX].height.height >=
                   APOGEE_PERCENTAGE * dummy_config.pred_apogee &&
               is_zero(g_avg_vel, ZERO_VEL_TOL) &&
-              is_zero(data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
+              is_zero(g_data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {
               event.event = FEVENT_APOGEE;
               event.timestamp = orb_absolute_time();
@@ -309,7 +338,7 @@ int main(int argc, char **argv)
            */
 
           if (is_zero(g_avg_vel, ZERO_VEL_TOL) &&
-              is_zero(data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
+              is_zero(g_data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {
               event.event = FEVENT_LANDED;
               event.timestamp = orb_absolute_time();
@@ -354,10 +383,16 @@ int main(int argc, char **argv)
         }
     }
 
-  orb_unsubscribe(vel_fd);
-clean_alt:
-  orb_unsubscribe(height_fd);
-clean_eventonly:
+clean_fds:
+
+  for (int i = 0; i < array_len(g_fds); i++)
+    {
+      if (g_fds[i].fd > 0)
+        {
+          orb_unsubscribe(g_fds[i].fd);
+        }
+    }
+
   orb_unadvertise(event_fd);
   return ret;
 }
