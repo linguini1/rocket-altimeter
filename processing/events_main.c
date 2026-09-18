@@ -95,10 +95,6 @@ struct topic_s
  * Private Data
  ****************************************************************************/
 
-static struct processconfig_s dummy_config = {
-    .pred_apogee = 10000.0f, /* Matches default of fake barometer curve */
-};
-
 /* Optional debug output format string */
 
 #ifdef CONFIG_DEBUG_UORB
@@ -221,6 +217,8 @@ int main(int argc, char **argv)
         }
     }
 
+  /* TODO: Read in the configuration. */
+
   /* Set up flight event topic for publishing */
 
   event_fd = orb_advertise_multi_queue(ORB_ID(flight_event), NULL, &devno,
@@ -340,8 +338,9 @@ int main(int argc, char **argv)
            * the predicted apogee, then we have reached apogee!
            */
 
-          if (in_apogee_window(g_data[HEIGHT_IDX].height.height,
-                               dummy_config.pred_apogee) &&
+          /* TODO: remove hard-coded apogee prediction */
+
+          if (in_apogee_window(g_data[HEIGHT_IDX].height.height, 10000.0f) &&
               is_zero(g_avg_vel, ZERO_VEL_TOL) &&
               is_zero(g_data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {

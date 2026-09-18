@@ -55,15 +55,6 @@ union sensor_data
   struct flight_event event;
 };
 
-/* Conditions for deployment */
-
-enum depcond_e
-{
-  COND_APOGEE = 0x1, /* Deploy at apogee */
-  COND_ALT = 0x2,    /* Deploy at configured altitude, after apogee */
-  COND_TIME = 0x4,   /* Deploy using timer, after ascent */
-};
-
 /* Represents a pyro channel */
 
 struct pyrochan_s
