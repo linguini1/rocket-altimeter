@@ -319,8 +319,6 @@ int main(int argc, char **argv)
          "Could not start sensor_baro%d using curve: not implemented\n",
          devno);
 
-cleanup_topic:
   orb_unadvertise(baro_fd);
-
   return EXIT_FAILURE;
 }
