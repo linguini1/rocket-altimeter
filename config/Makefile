@@ -8,5 +8,6 @@ PROGNAME  = config
 # Source files
 
 MAINSRC  = config_main.c
+CSRCS   += config_lib.c
 
 include $(APPDIR)/Application.mk
