@@ -25,4 +25,14 @@ config ROCKETALT_CONF_STACKSIZE
 	---help---
 		The stack size for the logging program.
 
+comment "General options"
+
+config ROCKETALT_CONF_MAXDEPCHANS
+	int "Maximum supported deployment channels"
+	default 2
+	---help---
+		The maximum number of deployment channels that can be parsed and
+		represented as a configuration. Increase this to match the device being
+		worked with.
+
 endif # ROCKETALT_CONF
