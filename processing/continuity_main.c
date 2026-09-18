@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
@@ -225,20 +226,49 @@ static int publish_continuity(int fd, struct chan_s *chan,
 
 int main(int argc, char **argv)
 {
+  int c;
   int err;
   int ret = EXIT_FAILURE;
   int cont_fd;
+  int devno = 0;
   struct adc_msg_s adc_data;
+
+  /* Parse command line arguments */
+
+  while ((c = getopt(argc, argv, ":n:")) != -1)
+    {
+      switch (c)
+        {
+        case 'n':
+          devno = atoi(optarg);
+          break;
+
+        case ':':
+          syslog(LOG_ERR | LOG_USER, "Option -%c requires an argument.\n",
+                 optopt);
+          return EXIT_FAILURE;
+
+        case '?':
+          syslog(LOG_ERR | LOG_USER, "Unknown option '-%c'.\n", optopt);
+          break; /* Don't exit, parse other options */
+
+        default:
+          syslog(LOG_ERR | LOG_USER,
+                 "Usage: continuity [-n devno] devpath channo ...\n");
+          return EXIT_FAILURE;
+        }
+    }
 
   /* Ensure enough arguments were passed to the program for all of the ADC
    * device paths and channel numbers.
    */
 
-  if (argc < 2 * CONFIG_ROCKETALT_CONTMON_NUMCHANS + 1)
+  if (argc - optind < 2 * CONFIG_ROCKETALT_CONTMON_NUMCHANS)
     {
       syslog(LOG_ERR | LOG_USER,
-             "Not enough arguments for all channels. Got %d, need %d\n", argc,
-             2 * CONFIG_ROCKETALT_CONTMON_NUMCHANS + 1);
+             "Not enough positional arguments for all channels. Got %d, need "
+             "%d\n",
+             argc - optind, 2 * CONFIG_ROCKETALT_CONTMON_NUMCHANS);
       return EXIT_FAILURE;
     }
 
@@ -248,8 +278,9 @@ int main(int argc, char **argv)
     {
       g_channels[i].id = i + 1;
       g_channels[i].fd = -1;
-      g_channels[i].path = argv[2 * i + 1];
-      g_channels[i].channo = atoi(argv[2 * i + 2]);
+      g_channels[i].path = argv[optind];
+      g_channels[i].channo = atoi(argv[optind + 1]);
+      optind += 2;
 
       syslog(LOG_INFO | LOG_USER, "Channel %d using %s, ADC channo %d\n",
              g_channels[i].id, g_channels[i].path, g_channels[i].channo);
@@ -261,16 +292,16 @@ int main(int argc, char **argv)
 
   /* Set up continuity topic for publishing */
 
-  cont_fd = orb_advertise_multi_queue(ORB_ID(sensor_continuity), NULL, NULL,
+  cont_fd = orb_advertise_multi_queue(ORB_ID(sensor_continuity), NULL, &devno,
                                       CONFIG_ROCKETALT_CONTMON_VOLTAGE_QLEN);
   if (cont_fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
-             "Could not advertise sensor_continuity topic: %d\n", errno);
+             "Could not advertise sensor_continuity%d: %d\n", devno, errno);
       return EXIT_FAILURE;
     }
 
-  syslog(LOG_INFO | LOG_USER, "sensor_continuity topic advertised.\n");
+  syslog(LOG_INFO | LOG_USER, "sensor_continuity%d advertised.\n", devno);
 
   /* Open ADC devices */
 
@@ -347,7 +378,6 @@ cleanup_channels:
       channel_deinit(&g_channels[i]);
     }
 
-cleanup_continuity:
   orb_unadvertise(cont_fd);
 
   return ret;
