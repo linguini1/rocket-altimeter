@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
@@ -51,7 +52,11 @@ ORB_DECLARE(sensor_voltage);
 
 int main(int argc, char **argv)
 {
+  int c;
   int err;
+  int devno = 0;
+  int ret = EXIT_FAILURE;
+  char *adcpath = NULL;
   int bat_fd;
   int adc_fd;
   uint8_t channo;
@@ -59,40 +64,70 @@ int main(int argc, char **argv)
   struct adc_msg_s adc_data;
   struct sensor_voltage volt;
 
-  /* Ensure we have sufficient arguments for the ADC */
+  /* Parse command line arguments */
 
-  if (argc < 3)
+  while ((c = getopt(argc, argv, ":n:")) != -1)
     {
-      syslog(LOG_ERR | LOG_USER,
-             "Program must be started with first argument as ADC device "
-             "path, second argument ADC channo.\n");
+      switch (c)
+        {
+        case 'n':
+          devno = atoi(optarg);
+          break;
+
+        case ':':
+          syslog(LOG_ERR | LOG_USER, "Option -%c requires an argument.\n",
+                 optopt);
+          return EXIT_FAILURE;
+
+        case '?':
+          syslog(LOG_ERR | LOG_USER, "Unknown option '-%c'.\n", optopt);
+          break; /* Don't exit, parse other options */
+
+        default:
+          syslog(LOG_ERR | LOG_USER,
+                 "Usage: adcbat [-n devno] devpath channo\n");
+          return EXIT_FAILURE;
+        }
+    }
+
+  if (argc < optind)
+    {
+      syslog(LOG_ERR | LOG_USER, "Expected ADC device path.\n");
       return EXIT_FAILURE;
     }
 
-  channo = atoi(argv[2]); /* Parse channel number */
+  adcpath = argv[optind++];
+
+  if (argc < optind)
+    {
+      syslog(LOG_ERR | LOG_USER, "Expected ADC channel number.\n");
+      return EXIT_FAILURE;
+    }
+
+  channo = atoi(argv[optind]); /* Parse channel number */
 
   /* Set up battery topic for publishing */
 
-  bat_fd = orb_advertise_multi_queue(ORB_ID(sensor_voltage), NULL, NULL,
+  bat_fd = orb_advertise_multi_queue(ORB_ID(sensor_voltage), NULL, &devno,
                                      CONFIG_ROCKETALT_BATMON_VOLTAGE_QLEN);
   if (bat_fd < 0)
     {
-      syslog(LOG_ERR | LOG_USER,
-             "Could not advertise sensor_voltage topic: %d\n", errno);
+      syslog(LOG_ERR | LOG_USER, "Could not advertise sensor_voltage%d: %d\n",
+             devno, errno);
       return EXIT_FAILURE;
     }
 
-  syslog(LOG_INFO | LOG_USER, "sensor_voltage topic advertised.\n");
+  syslog(LOG_INFO | LOG_USER, "sensor_voltage%d advertised.\n", devno);
 
   /* Open ADC device */
 
-  adc_fd = open(argv[1], O_RDONLY);
+  adc_fd = open(adcpath, O_RDONLY);
   if (adc_fd < 0)
     {
       syslog(LOG_ERR | LOG_USER, "Could not open ADC device %s: %d\n",
-             argv[1], errno);
-      orb_unadvertise(bat_fd);
-      return EXIT_FAILURE;
+             adcpath, errno);
+      ret = EXIT_FAILURE;
+      goto clean_bat;
     }
 
   /* Forever convert ADC measurements to voltage uORB output */
@@ -139,7 +174,8 @@ int main(int argc, char **argv)
 #endif
     }
 
-  orb_unadvertise(bat_fd);
   close(adc_fd);
-  return EXIT_FAILURE;
+clean_bat:
+  orb_unadvertise(bat_fd);
+  return ret;
 }
