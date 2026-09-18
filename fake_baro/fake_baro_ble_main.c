@@ -81,7 +81,7 @@ int main(int argc, char **argv)
    * interface name
    */
 
-  if (argc < optind)
+  if (argc <= optind)
     {
       syslog(LOG_ERR | LOG_USER, "fake_baro expected BLE interface name.\n");
       return EXIT_FAILURE;

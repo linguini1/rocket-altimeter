@@ -79,7 +79,7 @@ int main(int argc, char **argv)
 
   /* Ensure that after parsing options, we are also given a CSV path */
 
-  if (argc < optind)
+  if (argc <= optind)
     {
       syslog(LOG_ERR | LOG_USER, "fake_baro expected CSV path.\n");
       return EXIT_FAILURE;
