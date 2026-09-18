@@ -5,6 +5,7 @@
 #include <nuttx/config.h>
 
 #include <fcntl.h>
+#include <getopt.h>
 #include <math.h>
 #include <nuttx/sched.h>
 #include <poll.h>
@@ -46,6 +47,8 @@ ORB_DECLARE(flight_event);
  * Private Types
  ****************************************************************************/
 
+/* Types of sensor data that can be read in */
+
 union sensor_data
 {
   struct fusion_height height;
@@ -76,6 +79,14 @@ struct pyrochan_s
   bool fired;      /* Whether or not this channel has been deployed */
 };
 
+/* Represents a uORB topic that is taken as input */
+
+struct topic_s
+{
+  FAR const struct orb_metadata *meta;
+  int devno;
+};
+
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
@@ -103,6 +114,21 @@ static const char deploy_event_format[] =
 /* Definition for deployment event topic */
 
 ORB_DEFINE(deploy_event, struct deploy_event, deploy_event_format);
+
+/* Input topics */
+
+static struct topic_s g_topics[2] = {
+    [HEIGHT_IDX] =
+        {
+            .meta = ORB_ID(fusion_height),
+            .devno = 0,
+        },
+    [EVENT_IDX] =
+        {
+            .meta = ORB_ID(flight_event),
+            .devno = 0,
+        },
+};
 
 /****************************************************************************
  * Private Functions
@@ -487,6 +513,8 @@ int main(int argc, char **argv)
 {
   int err;
   int ret;
+  int c;
+  int devno = 0;
   int dep_fd;
   void *threadret;
   union sigval cancelval;
@@ -494,25 +522,62 @@ int main(int argc, char **argv)
   union sensor_data data[2];
   g_thread_started = false; /* Initially not started */
 
+  static_assert(array_len(fds) == array_len(g_topics),
+                "Array length mismatch.");
+  static_assert(array_len(fds) == array_len(data), "Array length mismatch.");
+
+  /* Parse command line arguments */
+
+  while ((c = getopt(argc, argv, ":n:h:f:")) != -1)
+    {
+      switch (c)
+        {
+        case 'n':
+          devno = atoi(argv[optind]);
+          break;
+
+        case 'h':
+          g_topics[HEIGHT_IDX].devno = atoi(argv[optind]);
+          break;
+
+        case 'f':
+          g_topics[EVENT_IDX].devno = atoi(argv[optind]);
+          break;
+
+        case ':':
+          syslog(LOG_ERR | LOG_USER, "Option -%c requires an argument.\n",
+                 optopt);
+          return EXIT_FAILURE;
+
+        case '?':
+          syslog(LOG_ERR | LOG_USER, "Unknown option '-%c'.\n", optopt);
+          break; /* Don't exit, parse other options */
+
+        default:
+          syslog(LOG_ERR | LOG_USER,
+                 "Usage: deployment [-n devno] gpiopath gpiopath\n");
+          return EXIT_FAILURE;
+        }
+    }
+
   /* Ensure that the number of arguments aligns with the number of GPIO device
    * paths we're expecting.
    */
 
-  if (argc < CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS + 1)
+  if (argc - optind < CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS)
     {
       syslog(LOG_ERR | LOG_USER,
              "Received %d possible paths, should have %d\n", argc,
-             CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS + 1);
-      return EXIT_FAILURE;
+             CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS);
     }
 
   /* Initialize deployment channels */
 
-  for (int i = 0; i < array_len(g_channels); i++)
+  for (int i = 0; i < array_len(g_channels); i++, optind++)
     {
       g_channels[i].fd = -1;
       g_channels[i].id = i + 1;
-      g_channels[i].path = argv[i + 1];
+      g_channels[i].path = argv[optind];
       g_channels[i].fired = false;
       g_channels[i].t_started = false;
 
@@ -551,17 +616,17 @@ int main(int argc, char **argv)
 
   /* Set up deployment event topic for publishing */
 
-  dep_fd = orb_advertise_multi_queue(ORB_ID(deploy_event), NULL, NULL,
+  dep_fd = orb_advertise_multi_queue(ORB_ID(deploy_event), NULL, &devno,
                                      CONFIG_ROCKETALT_DEPLOYMENT_QLEN);
   if (dep_fd < 0)
     {
-      syslog(LOG_ERR | LOG_USER,
-             "Could not advertise deploy_event topic: %d\n", errno);
+      syslog(LOG_ERR | LOG_USER, "Could not advertise deploy_event%d: %d\n",
+             devno, errno);
       ret = EXIT_FAILURE;
       goto clean_channels;
     }
 
-  syslog(LOG_INFO | LOG_USER, "deploy_event topic advertised.\n");
+  syslog(LOG_INFO | LOG_USER, "deploy_event%d advertised.\n", devno);
 
   /* If there are any channels configured to use timer-based deployment, set
    * up a timer thread.
@@ -581,34 +646,24 @@ int main(int argc, char **argv)
         }
     }
 
-  /* Subscribe to height topic */
+  /* Subscribe to uORB topics */
 
-  fds[HEIGHT_IDX].fd = orb_subscribe_multi(ORB_ID(fusion_height), 0);
-  if (fds[HEIGHT_IDX].fd < 0)
+  for (int i = 0; i < array_len(g_topics); i++)
     {
-      syslog(LOG_ERR | LOG_USER,
-             "Could not subscribe to fusion_height0: %d\n", errno);
-      ret = EXIT_FAILURE;
-      goto clean_dep;
+      fds[i].fd = orb_subscribe_multi(g_topics[i].meta, g_topics[i].devno);
+      if (fds[i].fd < 0)
+        {
+          syslog(LOG_ERR | LOG_USER, "Could not subscribe to %s%d: %d\n",
+                 g_topics[i].meta->o_name, g_topics[i].devno, errno);
+          ret = EXIT_FAILURE;
+          goto clean_topics;
+        }
+
+      /* Set up for polling */
+
+      fds[i].events = POLLIN;
+      fds[i].revents = 0;
     }
-
-  /* Subscribe to flight event topic */
-
-  fds[EVENT_IDX].fd = orb_subscribe_multi(ORB_ID(flight_event), 0);
-  if (fds[EVENT_IDX].fd < 0)
-    {
-      syslog(LOG_ERR | LOG_USER, "Could not subscribe to flight_event0: %d\n",
-             errno);
-      ret = EXIT_FAILURE;
-      goto clean_height;
-    }
-
-  /* Set up for polling */
-
-  fds[EVENT_IDX].events = POLLIN;
-  fds[EVENT_IDX].revents = 0;
-  fds[HEIGHT_IDX].events = POLLIN;
-  fds[HEIGHT_IDX].revents = 0;
 
   /* Assume start on the ground to avoid bad deployments */
 
@@ -633,7 +688,26 @@ int main(int argc, char **argv)
         {
           if (fds[i].revents & POLLIN)
             {
-              orb_copy_multi(fds[i].fd, &data[i], sizeof(union sensor_data));
+              switch (i)
+                {
+                case HEIGHT_IDX:
+                  err = orb_copy_multi(fds[i].fd, &data[i].height,
+                                       g_topics[i].meta->o_size);
+                  break;
+
+                case EVENT_IDX:
+                  err = orb_copy_multi(fds[i].fd, &data[i].event,
+                                       g_topics[i].meta->o_size);
+                  break;
+                }
+
+              if (err < 0)
+                {
+                  syslog(LOG_ERR | LOG_USER,
+                         "Couldn't get data from %s%d: %d\n",
+                         g_topics[i].meta->o_name, g_topics[i].devno, errno);
+                }
+
               fds[i].revents = 0; /* Clear events */
             }
         }
@@ -717,15 +791,6 @@ int main(int argc, char **argv)
         }
     }
 
-  orb_unsubscribe(fds[EVENT_IDX].fd);
-
-clean_height:
-  orb_unsubscribe(fds[HEIGHT_IDX].fd);
-
-clean_dep:
-  orb_unadvertise(dep_fd);
-
-clean_thread:
   if (g_thread_started)
     {
       cancelval.sival_ptr = NULL;
@@ -750,7 +815,7 @@ clean_thread:
 
           /* No point joining if we couldn't cancel. */
 
-          goto clean_channels;
+          goto clean_topics;
         }
 
       err = pthread_join(g_thread, &threadret);
@@ -763,6 +828,17 @@ clean_thread:
       syslog(LOG_INFO | LOG_USER, "Timer thread exited with status %d\n",
              (int)threadret);
     }
+
+clean_topics:
+  for (int i = 0; i < array_len(fds); i++)
+    {
+      if (fds[i].fd > 0)
+        {
+          close(fds[i].fd);
+        }
+    }
+
+  orb_unadvertise(dep_fd);
 
 clean_channels:
   for (int i = 0; i < array_len(g_channels); i++)
