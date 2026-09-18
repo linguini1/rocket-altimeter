@@ -90,7 +90,7 @@ int main(int argc, char **argv)
         }
     }
 
-  if (argc < optind)
+  if (argc <= optind)
     {
       syslog(LOG_ERR | LOG_USER, "Expected ADC device path.\n");
       return EXIT_FAILURE;
@@ -98,7 +98,7 @@ int main(int argc, char **argv)
 
   adcpath = argv[optind++];
 
-  if (argc < optind)
+  if (argc <= optind)
     {
       syslog(LOG_ERR | LOG_USER, "Expected ADC channel number.\n");
       return EXIT_FAILURE;
