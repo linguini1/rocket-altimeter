@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <math.h>
 #include <poll.h>
 #include <stdint.h>
@@ -187,25 +188,52 @@ static void update_avg_vel(float new)
 
 int main(int argc, char **argv)
 {
+  int c;
   int err;
   int ret;
   int event_fd;
+  int devno = 0;
   struct flight_event event;
   enum fevent_e current = FEVENT_GROUNDED;
 
+  /* Parse command line arguments */
+
+  while ((c = getopt(argc, argv, ":n:")) != -1)
+    {
+      switch (c)
+        {
+        case 'n':
+          devno = atoi(optarg);
+          break;
+
+        case ':':
+          syslog(LOG_ERR | LOG_USER, "Option -%c requires an argument.\n",
+                 optopt);
+          return EXIT_FAILURE;
+
+        case '?':
+          syslog(LOG_ERR | LOG_USER, "Unknown option '-%c'.\n", optopt);
+          break; /* Don't exit, parse other options */
+
+        default:
+          syslog(LOG_ERR | LOG_USER, "Usage: events_topic [-n devno]\n");
+          return EXIT_FAILURE;
+        }
+    }
+
   /* Set up flight event topic for publishing */
 
-  event_fd = orb_advertise_multi_queue(ORB_ID(flight_event), NULL, NULL,
+  event_fd = orb_advertise_multi_queue(ORB_ID(flight_event), NULL, &devno,
                                        CONFIG_ROCKETALT_EVENT_QLEN);
   if (event_fd < 0)
     {
-      syslog(LOG_ERR | LOG_USER,
-             "Could not advertise flight_event topic: %d\n", errno);
+      syslog(LOG_ERR | LOG_USER, "Could not advertise flight_event%d: %d\n",
+             devno, errno);
       ret = EXIT_FAILURE;
       return ret;
     }
 
-  syslog(LOG_INFO | LOG_USER, "flight_event topic advertised.\n");
+  syslog(LOG_INFO | LOG_USER, "flight_event%d advertised.\n", devno);
 
   /* Subscribe to uORB topics */
 
