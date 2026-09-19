@@ -37,6 +37,7 @@
 /* Signal used for deployment timers */
 
 #define TIMER_SIG SIGALRM
+#define THREAD_CANCEL_SIG SIGUSR1
 
 /* Program already knows flight events and height */
 
@@ -235,6 +236,15 @@ static int channel_deinit(struct pyrochan_s *chan)
       chan->fd = -1;
     }
 
+  /* Try to remove timer. Should be no side effects if the timer is already
+   * deleted.
+   */
+
+  if (chan->t_started)
+    {
+      timer_delete(chan->timerid);
+    }
+
   return err;
 }
 
@@ -351,7 +361,9 @@ static void *timer_thread(void *arg)
       return (void *)(uintptr_t)errno;
     }
 
-  err = sigaddset(&set, SIGABRT); /* We also allow a cancellation signal */
+  /* We also allow a cancellation signal */
+
+  err = sigaddset(&set, THREAD_CANCEL_SIG);
   if (err < 0)
     {
       syslog(LOG_ERR | LOG_USER, "Couldn't configure signal set: %d\n",
@@ -388,7 +400,7 @@ static void *timer_thread(void *arg)
 
       /* If this was a cancellation signal, stop execution and return */
 
-      if (info.si_signo == SIGABRT)
+      if (info.si_signo == THREAD_CANCEL_SIG)
         {
           syslog(LOG_INFO | LOG_USER, "Timer thread cancelled.\n");
           return 0;
@@ -785,20 +797,7 @@ int main(int argc, char **argv)
   if (g_thread_started)
     {
       cancelval.sival_ptr = NULL;
-
-      /* NOTE: NuttX has no `pthread_sigqueue` implementation. However, the
-       * `sigqueue` implementation is documented as taking a 'task ID' as the
-       * first argument. As far as I can tell, NuttX gives a unique task ID to
-       * each process AND thread. So it should be safe to use the pthread
-       * handle as a task ID here.
-       */
-
-#if 0
-      err = sigqueue(g_thread, SIGABRT, cancelval);
-#else
-      err = sigqueue(g_thread, SIGABRT, cancelval);
-#endif
-
+      err = pthread_sigqueue(g_thread, THREAD_CANCEL_SIG, cancelval);
       if (err)
         {
           syslog(LOG_ERR | LOG_USER,
@@ -814,6 +813,7 @@ int main(int argc, char **argv)
         {
           syslog(LOG_ERR | LOG_USER, "Couldn't join to timer thread: %d\n",
                  err);
+          goto clean_topics;
         }
 
       syslog(LOG_INFO | LOG_USER, "Timer thread exited with status %d\n",
