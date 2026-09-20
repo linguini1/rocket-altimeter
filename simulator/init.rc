@@ -1,0 +1,176 @@
+/****************************************************************************
+ * peanut/src/etc/init.d/rc.sysinit
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.  The
+ * ASF licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ *
+ ****************************************************************************/
+
+#include <nuttx/config.h>
+
+/* nxinit system-init script
+ * 
+ * This script is responsible for booting Peanut, configuring everything it
+ * needs to run, and then executing the firmware stack for operation.
+ */ 
+
+/* At boot time, we want to set up all the things our firmware processes will
+ * need.
+ */
+
+/* At init, everything our firmware applications need should be present. We want
+ * to start up the entire stack of processes for regular operation.
+ */
+
+on init
+#ifdef CONFIG_FS_TMPFS
+   mount -t tmpfs /tmp
+#endif
+#ifdef CONFIG_FS_HOSTFS
+   mount -t hostfs -o fs=. /data
+#endif
+
+#if defined(CONFIG_ROCKETALT_FAKE_BARO) && !defined(CONFIG_ROCKETALT_FAKE_BARO_USEBLE)
+    /* Start the fake barometer service on initialization only if we're not
+     * using the Bluetooth implementation. Bluetooth needs to wait for network
+     * initialization.
+     */
+
+    start fakebaro
+#endif /* CONFIG_ROCKETALT_FAKE_BARO && !CONFIG_ROCKETALT_FAKE_BARO_USEBLE */
+
+#ifdef CONFIG_ROCKETALT_PROCESSING
+    class_start processing /* Start all the data processing topics */
+#endif /* CONFIG_ROCKETALT_PROCESSING */
+
+#ifdef CONFIG_ROCKETALT_DEPLOYMENT
+    start deployment /* Deployment control process */
+#endif /* CONFIG_ROCKETALT_DEPLOYMENT */
+
+#ifdef CONFIG_ROCKETALT_LOGGER
+    start logging /* Data logging process */
+#endif /* CONFIG_ROCKETALT_LOGGER */
+
+/* We need the network stack initialized in order to use the Bluetooth daemon.
+ */
+
+on netinit
+#ifdef CONFIG_ROCKETALT_BTDAEMON
+    ifup bnep0 /* Check that interface is up */
+    start ble  /* Bluetooth daemon */
+#endif /* CONFIG_ROCKETALT_BTDAEMON */
+
+#if defined(CONFIG_ROCKETALT_FAKE_BARO_USEBLE)
+    start fakebaro /* Start Bluetooth fake barometer implementation */
+#endif /* CONFIG_ROCKETALT_FAKE_BARO_USEBLE */
+
+
+/* At finalinit, our firmware stack should be running normally. Here we can do
+ * anything that isn't critical for operation, like giving the user a nice shell
+ * or displaying startup info.
+ */
+
+on finalinit
+#ifdef CONFIG_EXAMPLES_TXMORSE
+    start jingle  /* Play startup jingle on the buzzer */
+#endif /* CONFIG_EXAMPLES_TXMORSE */
+    start console /* Start the shell */
+
+service console sh
+
+#ifdef CONFIG_EXAMPLES_TXMORSE
+service jingle txmorse peanut /dev/gpio0
+    oneshot
+#endif /* CONFIG_EXAMPLES_TXMORSE */
+
+/* Rocket altimeter logic services
+ * TODO: A restart_period of 0 since these services are not meant to exit?
+ * If they do, they must be re-started immediately.
+ *
+ * TODO: for now, these are all one-shot to avoid constant re-starting.
+ */
+
+#ifdef CONFIG_ROCKETALT_FAKE_BARO
+
+/* The fake barometer service has different arguments depending on the
+ * implementation that was selected.
+ */
+
+#ifdef CONFIG_ROCKETALT_FAKE_BARO_USECSV
+service fakebaro fake_baro -n 0 /data/baro.csv /* CSV barometer */
+    oneshot
+#endif /* CONFIG_ROCKETALT_FAKE_BARO_USECSV */
+
+#ifdef CONFIG_ROCKETALT_FAKE_BARO_USEBLE
+service fakebaro fake_baro -n 0 bnep0 /* Bluetooth barometer */
+    oneshot
+#endif /* CONFIG_ROCKETALT_FAKE_BARO_USEBLE */
+
+#ifdef CONFIG_ROCKETALT_FAKE_BARO_USECURVE
+service fakebaro fake_baro -n 0 /* Curve barometer using defaults */
+    oneshot
+#endif /* CONFIG_ROCKETALT_FAKE_BARO_USECURVE */
+
+#endif /* CONFIG_ROCKETALT_FAKE_BARO */
+
+#ifdef CONFIG_ROCKETALT_PROCESSING
+service altitude altitude_fusion
+    class processing
+    oneshot
+
+service velocity velocity_fusion
+    class processing
+    oneshot
+
+service events events_topic /data/config.conf
+    class processing
+    oneshot
+
+#ifdef CONFIG_ROCKETALT_PROCESSING_BATMON
+service batmon adcbat /dev/adc0 2
+    class processing
+    oneshot
+#endif /* CONFIG_ROCKETALT_PROCESSING_BATMON */
+
+#ifdef CONFIG_ROCKETALT_PROCESSING_CONTMON
+service contmon continuity /dev/adc0 3 /dev/adc0 4
+    class processing
+    oneshot
+#endif /* CONFIG_ROCKETALT_PROCESSING_CONTMON */
+
+#endif /* CONFIG_ROCKETALT_PROCESSING */
+
+#ifdef CONFIG_ROCKETALT_DEPLOYMENT
+
+/* Starting the deployment program with the two GPIO device paths as arguments
+ * tells the deployment daemon that gpio1 is pyro channel 1, and gpio2 is pyro
+ * channel 2.
+ */
+
+service deployment deployment /data/config.conf /dev/gpio1 /dev/gpio2
+    oneshot
+#endif /* CONFIG_ROCKETALT_DEPLOYMENT */
+
+#ifdef CONFIG_ROCKETALT_LOGGER
+service logging logger
+    oneshot
+#endif /* CONFIG_ROCKETALT_LOGGER */
+
+#ifdef CONFIG_ROCKETALT_BTDAEMON
+service ble btdaemon bnep0
+    oneshot
+#endif /* CONFIG_ROCKETALT_BTDAEMON */
