@@ -187,12 +187,12 @@ int main(int argc, char **argv)
 {
   int c;
   int err;
-  int ret;
+  int ret = EXIT_FAILURE;
   int event_fd;
   int devno = 0;
   const char *configpath = NULL;
   struct flight_event event;
-  enum fevent_e current = FEVENT_GROUNDED;
+  enum fevent_e current;
   struct config_s config;
 
   /* Parse command line arguments */
@@ -284,6 +284,10 @@ int main(int argc, char **argv)
    * FEVENT_GROUNDED so we don't compute a crazy event. Zero velocity
    * and zero height is reasonable for this.
    */
+
+  event.timestamp = 0; /* Indicate that this is an initial value */
+  event.event = FEVENT_GROUNDED;
+  current = FEVENT_GROUNDED;
 
   g_data[HEIGHT_IDX].height.height = 0.0f;
   g_data[VEL_IDX].vel.velocity = 0.0f;
