@@ -1,5 +1,6 @@
 # Build artifacts
 *.o
+*.su
 *.built
 *.gcno
 *.gcda
