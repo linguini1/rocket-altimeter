@@ -629,6 +629,7 @@ int main(int argc, char **argv)
 
   /* Set up deployment channel file descriptors */
 
+#ifndef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
   for (int i = 0; i < array_len(g_channels); i++)
     {
       /* Not opening a deployment channel should be considered fatal */
@@ -644,6 +645,7 @@ int main(int argc, char **argv)
 
       g_channels[i].fd = err; /* Store the opened fd */
     }
+#endif /* !CONFIG_ROCKETALT_DEPLOYMENT_MOCK */
 
   /* Set up deployment event topic for publishing */
 
@@ -861,10 +863,12 @@ clean_topics:
   orb_unadvertise(dep_fd);
 
 clean_channels:
+#ifndef CONFIG_ROCKETALT_DEPLOYMENT_MOCK
   for (int i = 0; i < array_len(g_channels); i++)
     {
       channel_deinit(&g_channels[i]);
     }
+#endif /* !CONFIG_ROCKETALT_DEPLOYMENT_MOCK */
 
   return ret;
 }
