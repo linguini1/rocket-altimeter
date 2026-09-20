@@ -19,6 +19,7 @@
 #include <uORB/uORB.h>
 
 #include "../common/common.h"
+#include "../common/config.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -189,8 +190,10 @@ int main(int argc, char **argv)
   int ret;
   int event_fd;
   int devno = 0;
+  const char *configpath = NULL;
   struct flight_event event;
   enum fevent_e current = FEVENT_GROUNDED;
+  struct config_s config;
 
   /* Parse command line arguments */
 
@@ -212,12 +215,34 @@ int main(int argc, char **argv)
           break; /* Don't exit, parse other options */
 
         default:
-          syslog(LOG_ERR | LOG_USER, "Usage: events_topic [-n devno]\n");
+          syslog(LOG_ERR | LOG_USER,
+                 "Usage: events_topic [-n devno] configpath\n");
           return EXIT_FAILURE;
         }
     }
 
-  /* TODO: Read in the configuration. */
+  /* Get configuration file path */
+
+  if (argc <= optind)
+    {
+      syslog(LOG_ERR | LOG_USER, "Expected configuration file path.\n");
+      return EXIT_FAILURE;
+    }
+
+  configpath = argv[optind];
+  optind++;
+  syslog(LOG_INFO | LOG_USER, "flight_event%d configuration '%s'\n", devno,
+         configpath);
+
+  /* Read in the configuration */
+
+  err = rocketalt_config_from_file(configpath, &config);
+  if (err)
+    {
+      syslog(LOG_ERR | LOG_USER, "Couldn't parse configuration '%s': %d\n",
+             configpath, err);
+      return EXIT_FAILURE;
+    }
 
   /* Set up flight event topic for publishing */
 
@@ -338,9 +363,8 @@ int main(int argc, char **argv)
            * the predicted apogee, then we have reached apogee!
            */
 
-          /* TODO: remove hard-coded apogee prediction */
-
-          if (in_apogee_window(g_data[HEIGHT_IDX].height.height, 10000.0f) &&
+          if (in_apogee_window(g_data[HEIGHT_IDX].height.height,
+                               rocketalt_config_apogee(&config)) &&
               is_zero(g_avg_vel, ZERO_VEL_TOL) &&
               is_zero(g_data[VEL_IDX].vel.velocity, ZERO_VEL_TOL))
             {
