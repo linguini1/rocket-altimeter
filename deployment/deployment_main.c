@@ -24,10 +24,16 @@
 #include <uORB/uORB.h>
 
 #include "../common/common.h"
+#include "../common/config.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* Warning for configuration file parsing */
+
+static_assert(CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS <= CONF_MAX_DEPCHANS,
+              "More channels than configuration parsing supports.");
 
 /* Indices into arrays needed for height and velocity data */
 
@@ -60,15 +66,13 @@ union sensor_data
 
 struct pyrochan_s
 {
-  char *path;      /* Channel GPIO path */
-  timer_t timerid; /* ID of this channel's timer (if used) */
-  int fd;          /* File descriptor to the channel GPIO */
-  int cond;        /* Deployment condition bitmask */
-  float altitude;  /* Altitude in meters */
-  uint16_t time;   /* Deployment time in seconds (for timer) */
-  uint8_t id;      /* Channel ID */
-  bool t_started;  /* True if the timer for this channel has been started */
-  bool fired;      /* Whether or not this channel has been deployed */
+  const char *path;                 /* Channel GPIO path */
+  const struct chan_config_s *conf; /* Channel configuration */
+  timer_t timerid;                  /* ID of this channel's timer (if used) */
+  int fd;                           /* File descriptor to the channel GPIO */
+  uint8_t id;                       /* Channel ID */
+  bool t_started; /* True if the timer for this channel has been started */
+  bool fired;     /* Whether or not this channel has been deployed */
 };
 
 /* Represents a uORB topic that is taken as input */
@@ -161,7 +165,7 @@ static int channel_start_timer(struct pyrochan_s *chan)
   sigevent_t evp;
   struct itimerspec config;
 
-  DEBUGASSERT(chan->cond & COND_TIME);
+  DEBUGASSERT(chan->conf->conditions & COND_TIME);
 
   /* Create the timer for this channel.
    *
@@ -190,7 +194,7 @@ static int channel_start_timer(struct pyrochan_s *chan)
    * `it_interval` is configured such that the timer expires just once.
    */
 
-  config.it_value.tv_sec = chan->time;
+  config.it_value.tv_sec = chan->conf->time;
   config.it_value.tv_nsec = 0;
 
   config.it_interval.tv_sec = 0;
@@ -208,7 +212,7 @@ static int channel_start_timer(struct pyrochan_s *chan)
 
   chan->t_started = true;
   syslog(LOG_INFO | LOG_USER, "Started %us timer for channel %d\n",
-         chan->time, chan->id);
+         chan->conf->time, chan->id);
   return err;
 }
 
@@ -520,9 +524,11 @@ int main(int argc, char **argv)
   int devno = 0;
   int dep_fd;
   void *threadret;
+  const char *configpath = NULL;
   union sigval cancelval;
   struct pollfd fds[2];
   union sensor_data data[2];
+  struct config_s config;
   g_thread_started = false; /* Initially not started */
 
   static_assert(array_len(fds) == array_len(g_topics),
@@ -557,11 +563,24 @@ int main(int argc, char **argv)
           break; /* Don't exit, parse other options */
 
         default:
-          syslog(LOG_ERR | LOG_USER,
-                 "Usage: deployment [-n devno] gpiopath gpiopath\n");
+          syslog(LOG_ERR | LOG_USER, "Usage: deployment [-n devno] "
+                                     "configpath gpiopath [... gpiopath]\n");
           return EXIT_FAILURE;
         }
     }
+
+  /* Ensure that first argument is the configuration file path */
+
+  if (argc <= optind)
+    {
+      syslog(LOG_ERR | LOG_USER, "Expected configuration path.\n");
+      return EXIT_FAILURE;
+    }
+
+  configpath = argv[optind];
+  optind++;
+  syslog(LOG_INFO | LOG_USER, "deploy_event%d configuration '%s'\n", devno,
+         configpath);
 
   /* Ensure that the number of arguments aligns with the number of GPIO device
    * paths we're expecting.
@@ -570,11 +589,22 @@ int main(int argc, char **argv)
   if (argc - optind < CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS)
     {
       syslog(LOG_ERR | LOG_USER,
-             "Received %d possible paths, should have %d\n", argc,
+             "Received %d possible paths, should have %d\n", argc - optind,
              CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS);
+      return EXIT_FAILURE;
     }
 
-  /* Initialize deployment channels */
+  /* Parse configuration file */
+
+  err = rocketalt_config_from_file(configpath, &config);
+  if (err)
+    {
+      syslog(LOG_ERR | LOG_USER, "Couldn't load configuration '%s': %d\n",
+             configpath, err);
+      return EXIT_FAILURE;
+    }
+
+  /* Configure deployment using configuration file. */
 
   for (int i = 0; i < array_len(g_channels); i++, optind++)
     {
@@ -583,21 +613,19 @@ int main(int argc, char **argv)
       g_channels[i].path = argv[optind];
       g_channels[i].fired = false;
       g_channels[i].t_started = false;
+      g_channels[i].conf =
+          rocketalt_config_getchan(&config, g_channels[i].id);
+
+      if (g_channels[i].conf == NULL)
+        {
+          syslog(LOG_ERR | LOG_USER, "Channel %d missing configuration.\n",
+                 g_channels[i].id);
+          return EXIT_FAILURE;
+        }
 
       syslog(LOG_USER | LOG_INFO, "Channel %d using %s\n", g_channels[i].id,
              g_channels[i].path);
     }
-
-  /* Configure deployment channels
-   * TODO: do this dynamically from the configuration file.
-   */
-
-  g_channels[0].cond = COND_APOGEE | COND_TIME;
-  g_channels[0].time = 10;
-
-  g_channels[1].cond = COND_ALT | COND_TIME;
-  g_channels[1].altitude = 305.0f; /* 1000 ft */
-  g_channels[1].time = 20;
 
   /* Set up deployment channel file descriptors */
 
@@ -637,7 +665,7 @@ int main(int argc, char **argv)
 
   for (int i = 0; i < array_len(g_channels); i++)
     {
-      if (g_channels[i].cond & COND_TIME)
+      if (g_channels[i].conf->conditions & COND_TIME)
         {
           err = start_timer_thread(dep_fd);
 
@@ -733,7 +761,7 @@ int main(int argc, char **argv)
         {
           for (int i = 0; i < array_len(g_channels); i++)
             {
-              if ((g_channels[i].cond & COND_TIME) &&
+              if ((g_channels[i].conf->conditions & COND_TIME) &&
                   !g_channels[i].t_started)
                 {
                   err = channel_start_timer(&g_channels[i]);
@@ -754,7 +782,7 @@ int main(int argc, char **argv)
         {
           for (int i = 0; i < array_len(g_channels); i++)
             {
-              if (g_channels[i].cond & COND_APOGEE)
+              if (g_channels[i].conf->conditions & COND_APOGEE)
                 {
                   err = channel_fire(&g_channels[i]);
                   if (err == 0)
@@ -781,8 +809,9 @@ int main(int argc, char **argv)
         {
           for (int i = 0; i < array_len(g_channels); i++)
             {
-              if (g_channels[i].cond & COND_ALT &&
-                  data[HEIGHT_IDX].height.height <= g_channels[i].altitude)
+              if (g_channels[i].conf->conditions & COND_ALT &&
+                  data[HEIGHT_IDX].height.height <=
+                      g_channels[i].conf->altitude)
                 {
                   err = channel_fire(&g_channels[i]);
                   if (err == 0)
