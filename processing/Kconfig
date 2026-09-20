@@ -4,7 +4,7 @@
 #
 
 config ROCKETALT_PROCESSING
-	bool "Altimeter processing logic"
+	bool "Data processing logic"
 	default n
 	depends on UORB
 	depends on USENSOR
@@ -126,6 +126,7 @@ config ROCKETALT_PROCESSING_CONTMON
 		Enable support for monitoring continuity of deployment channels using an
 		ADC.
 
+if ROCKETALT_PROCESSING_CONTMON
 menu "Continuity monitor"
 
 config ROCKETALT_CONTMON_VOLTAGE_QLEN
@@ -174,5 +175,6 @@ config ROCKETALT_CONTMON_VTHRESH
 		The minimum voltage at which the channel is determined to be continuous.
 
 endmenu # Continuity monitor
+endif # ROCKETALT_PROCESSING_CONTMON
 
 endif # ROCKETALT_PROCESSING
