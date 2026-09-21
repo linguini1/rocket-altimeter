@@ -4,7 +4,7 @@
 #
 
 config ROCKETALT_BTDAEMON
-	bool "Bluetooth daemon"
+	tristate "Bluetooth daemon"
 	default n
 	depends on UORB
 	depends on USENSOR

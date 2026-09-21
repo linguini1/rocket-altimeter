@@ -4,7 +4,7 @@
 #
 
 config ROCKETALT_PROCESSING
-	bool "Data processing logic"
+	tristate "Data processing logic"
 	default n
 	depends on UORB
 	depends on USENSOR

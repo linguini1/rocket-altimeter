@@ -4,7 +4,7 @@
 #
 
 config ROCKETALT_LOGGER
-	bool "Data logging"
+	tristate "Data logging"
 	default n
 	depends on UORB
 	depends on USENSOR

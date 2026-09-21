@@ -4,7 +4,7 @@
 #
 
 config ROCKETALT_CONF
-	bool "Configuration tool"
+	tristate "Configuration tool"
 	default n
 	---help---
 		Allows modification of the system-wide altimeter configuration file.
