@@ -2,7 +2,9 @@
  * Included Files
  ****************************************************************************/
 
+#include <assert.h>
 #include <nuttx/config.h>
+#include <nuttx/version.h>
 
 #include <getopt.h>
 #include <poll.h>
@@ -48,10 +50,14 @@ ORB_DECLARE(sensor_continuity);
  * Private Data
  ****************************************************************************/
 
-/* Name of the BLE device which appears on the connecting device */
+/* Name that appears when advertising (discovery) */
 
-static const char g_gap_name[] = "Peanut";
-static const char g_dev_name[] = "Peanut Altimeter";
+static const char g_gap_name[] = CONFIG_ROCKETALT_BTDAEMON_GAPNAME;
+
+/* Firmware/software revision of the RTOS */
+
+static const char g_firmware_rev[] =
+    CONFIG_VERSION_STRING "-" CONFIG_VERSION_BUILD;
 
 static uint8_t g_own_addr_type; /* TODO: what is this for? */
 
@@ -73,10 +79,21 @@ void ble_hci_sock_set_device(int dev);
 static int gap_event_cb(FAR struct ble_gap_event *event, FAR void *arg);
 
 /****************************************************************************
- * Name: start_advertise
+ * Private Functions
  ****************************************************************************/
 
-static int start_advertise(void)
+/****************************************************************************
+ * Name: start_advertising
+ *
+ * Description:
+ *   Begins advertising the GAP.
+ *
+ * Returned Value:
+ *   0 on success, NimBLE error code on failure.
+ *
+ ****************************************************************************/
+
+static int start_advertising(void)
 {
   int rc;
   struct ble_gap_adv_params advp;
@@ -136,14 +153,14 @@ static int gap_event_cb(FAR struct ble_gap_event *event, FAR void *arg)
       {
         if (event->connect.status)
           {
-            start_advertise();
+            start_advertising();
           }
         break;
       }
 
     case BLE_GAP_EVENT_DISCONNECT:
       {
-        start_advertise();
+        start_advertising();
         break;
       }
     }
@@ -164,27 +181,46 @@ static void app_ble_sync_cb(void)
 
   /* Generate new non-resolvable private address */
 
-  syslog(LOG_INFO | LOG_USER, "Generate private address.\n");
   rc = ble_hs_id_gen_rnd(1, &addr);
-  assert(rc == 0);
+  if (rc)
+    {
+      syslog(LOG_ERR | LOG_USER, "ble_hs_id_gen_rnd: %d\n", rc);
+      DEBUGPANIC();
+      return;
+    }
 
   /* Set generated address */
 
-  syslog(LOG_INFO | LOG_USER, "Set generated address\n");
   rc = ble_hs_id_set_rnd(addr.val);
-  assert(rc == 0);
+  if (rc)
+    {
+      syslog(LOG_ERR | LOG_USER, "ble_hs_id_set_rnd: %d\n", rc);
+      DEBUGPANIC();
+      return;
+    }
 
-  syslog(LOG_INFO | LOG_USER, "ble_hs_util_ensure_addr\n");
   rc = ble_hs_util_ensure_addr(0);
-  assert(rc == 0);
+  if (rc)
+    {
+      syslog(LOG_ERR | LOG_USER, "ble_hs_util_ensure_addr: %d\n", rc);
+      DEBUGPANIC();
+      return;
+    }
 
-  syslog(LOG_INFO | LOG_USER, "ble_hs_id_infer_auto\n");
   rc = ble_hs_id_infer_auto(0, &g_own_addr_type);
-  assert(rc == 0);
+  if (rc)
+    {
+      syslog(LOG_ERR | LOG_USER, "ble_hs_id_infer_auto: %d\n", rc);
+      DEBUGPANIC();
+      return;
+    }
 
-  syslog(LOG_INFO | LOG_USER, "start_advertise\n");
-  rc = start_advertise();
-  assert(rc == 0);
+  rc = start_advertising();
+  if (rc)
+    {
+      syslog(LOG_ERR | LOG_USER, "Failed to start advertising: %d\n", rc);
+      DEBUGPANIC();
+    }
 }
 
 /****************************************************************************
@@ -209,11 +245,6 @@ static FAR void *ble_host_task(FAR void *param)
 
   /* TODO: what does this do? */
   ble_hs_cfg.sync_cb = app_ble_sync_cb;
-
-  /* Set some characteristics */
-
-  ble_svc_gap_device_name_set(g_gap_name);
-  ble_svc_dis_model_number_set(g_dev_name);
 
   /* Run the NimBLE stack */
 
@@ -368,14 +399,27 @@ int main(int argc, char **argv)
 
   /* Initialize services TODO: which ones do I need? */
 
-  ble_svc_gap_init();  /* Generic access (shows device name) */
+  /* Generic access (shows device name) */
+
+  ble_svc_gap_init();
+  ble_svc_gap_device_name_set(g_gap_name);
+
   ble_svc_gatt_init(); /* Generic attribute */
-  ble_svc_ans_init();  /* Alert notification service */
-  ble_svc_ias_init();  /* Immediate alert */
-  ble_svc_lls_init();  /* Link loss */
-  ble_svc_tps_init();  /* Transmit power */
-  ble_svc_bas_init();  /* Battery */
-  ble_svc_dis_init();  /* Device information */
+
+  /* Device information */
+
+  ble_svc_dis_init();
+  ble_svc_dis_model_number_set(CONFIG_ROCKETALT_BTDAEMON_DEVNAME);
+  ble_svc_dis_manufacturer_name_set(CONFIG_ROCKETALT_BTDAEMON_MANNAME);
+  ble_svc_dis_hardware_revision_set(CONFIG_ROCKETALT_BTDAEMON_HWREV);
+  ble_svc_dis_software_revision_set(g_firmware_rev);
+  ble_svc_dis_firmware_revision_set(g_firmware_rev);
+
+  ble_svc_ans_init(); /* Alert notification service */
+  ble_svc_ias_init(); /* Immediate alert */
+  ble_svc_lls_init(); /* Link loss */
+  ble_svc_tps_init(); /* Transmit power */
+  ble_svc_bas_init(); /* Battery */
 
   /* Other option for the battery service is to replace it with the Automation
    * IO Service, which has an Analog Input characteristic:

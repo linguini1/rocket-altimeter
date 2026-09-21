@@ -30,4 +30,36 @@ config ROCKETALT_BTDAEMON_STACKSIZE
 	---help---
 		The stack size for the btdaemon program.
 
+comment "Bluetooth GAP options"
+
+config ROCKETALT_BTDAEMON_GAPNAME
+	string "GAP name"
+	default "Rocketalt"
+	---help---
+		The Bluetooth GAP name to use. This is what shows up as the name in
+		discovery when advertising.
+
+comment "Bluetooth device info options"
+
+config ROCKETALT_BTDAEMON_DEVNAME
+	string "Device name"
+	default "Rocket Altimeter"
+	---help---
+		The Bluetooth device name to use. This is what shows up as the device
+		model under the device information service.
+
+config ROCKETALT_BTDAEMON_MANNAME
+	string "Manufacturer name"
+	default "Apache NuttX"
+	---help---
+		This is what shows up as the manufacturer model under the device
+		information service.
+
+config ROCKETALT_BTDAEMON_HWREV
+	string "Hardware revision"
+	default "0"
+	---help---
+		This is what shows up as the hardware revision under the device
+		information service.
+
 endif # ROCKETALT_BTDAEMON
