@@ -4,6 +4,7 @@
 
 #include <nuttx/config.h>
 
+#include <getopt.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,8 @@
 
 #include "host/ble_hs.h"
 #include "host/util/util.h"
+
+/* Existing services */
 
 #include "services/ans/ble_svc_ans.h"
 #include "services/bas/ble_svc_bas.h"
@@ -47,8 +50,8 @@ ORB_DECLARE(sensor_continuity);
 
 /* Name of the BLE device which appears on the connecting device */
 
-static const char *g_gap_name = "Peanut"; /* TODO: this gets truncated */
-static const char *g_dev_name = "Peanut Altimeter"; /* Device name */
+static const char g_gap_name[] = "Peanut";
+static const char g_dev_name[] = "Peanut Altimeter";
 
 static uint8_t g_own_addr_type; /* TODO: what is this for? */
 
@@ -70,60 +73,53 @@ void ble_hci_sock_set_device(int dev);
 static int gap_event_cb(FAR struct ble_gap_event *event, FAR void *arg);
 
 /****************************************************************************
- * Name: put_ad
- ****************************************************************************/
-
-static void put_ad(uint8_t ad_type, uint8_t ad_len, FAR const void *ad,
-                   FAR uint8_t *buf, FAR uint8_t *len)
-{
-  /* TODO: what does this do? */
-  buf[(*len)++] = ad_len + 1;
-  buf[(*len)++] = ad_type;
-
-  memcpy(&buf[*len], ad, ad_len);
-
-  *len += ad_len;
-}
-
-/****************************************************************************
- * Name: update_ad
- ****************************************************************************/
-
-static void update_ad(void)
-{
-  /* TODO: what does this do? */
-  uint8_t ad_flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-  uint8_t ad_len = 0;
-  uint8_t ad[BLE_HS_ADV_MAX_SZ];
-
-  put_ad(BLE_HS_ADV_TYPE_FLAGS, 1, &ad_flags, ad, &ad_len);
-  put_ad(BLE_HS_ADV_TYPE_COMP_NAME, sizeof(g_gap_name), g_gap_name, ad,
-         &ad_len);
-
-  ble_gap_adv_set_data(ad, ad_len);
-}
-
-/****************************************************************************
  * Name: start_advertise
  ****************************************************************************/
 
-static void start_advertise(void)
+static int start_advertise(void)
 {
-  struct ble_gap_adv_params advp;
   int rc;
+  struct ble_gap_adv_params advp;
+  struct ble_hs_adv_fields adv_fields;
 
-  syslog(LOG_INFO | LOG_USER, "Started advertising.");
-
-  /* TODO: what does this do? */
-
-  update_ad();
+  /* Set advertisement parameters */
 
   memset(&advp, 0, sizeof advp);
   advp.conn_mode = BLE_GAP_CONN_MODE_UND;
   advp.disc_mode = BLE_GAP_DISC_MODE_GEN;
+
+  /* Populate fields/information for the advertising data */
+
+  memset(&adv_fields, 0, sizeof(adv_fields));
+  adv_fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP,
+
+  adv_fields.name = (uint8_t *)g_gap_name;
+  adv_fields.name_len = strlen(g_gap_name);
+  adv_fields.name_is_complete = 1;
+
+  adv_fields.tx_pwr_lvl = BLE_HS_ADV_TX_PWR_LVL_AUTO;
+  adv_fields.tx_pwr_lvl_is_present = 1;
+
+  rc = ble_gap_adv_set_fields(&adv_fields);
+  if (rc)
+    {
+      syslog(LOG_ERR | LOG_USER, "Couldn't set advertisement fields: %d\n",
+             rc);
+      return rc;
+    }
+
+  /* Start advertising */
+
+  syslog(LOG_INFO | LOG_USER, "Started advertising!\n");
+
   rc = ble_gap_adv_start(g_own_addr_type, NULL, BLE_HS_FOREVER, &advp,
                          gap_event_cb, NULL);
-  assert(rc == 0);
+  if (rc)
+    {
+      syslog(LOG_ERR | LOG_USER, "Failed to advertise: %d\n", rc);
+    }
+
+  return rc;
 }
 
 /****************************************************************************
@@ -168,21 +164,27 @@ static void app_ble_sync_cb(void)
 
   /* Generate new non-resolvable private address */
 
+  syslog(LOG_INFO | LOG_USER, "Generate private address.\n");
   rc = ble_hs_id_gen_rnd(1, &addr);
   assert(rc == 0);
 
   /* Set generated address */
 
+  syslog(LOG_INFO | LOG_USER, "Set generated address\n");
   rc = ble_hs_id_set_rnd(addr.val);
   assert(rc == 0);
 
+  syslog(LOG_INFO | LOG_USER, "ble_hs_util_ensure_addr\n");
   rc = ble_hs_util_ensure_addr(0);
   assert(rc == 0);
 
+  syslog(LOG_INFO | LOG_USER, "ble_hs_id_infer_auto\n");
   rc = ble_hs_id_infer_auto(0, &g_own_addr_type);
   assert(rc == 0);
 
-  start_advertise();
+  syslog(LOG_INFO | LOG_USER, "start_advertise\n");
+  rc = start_advertise();
+  assert(rc == 0);
 }
 
 /****************************************************************************
@@ -312,25 +314,57 @@ static int continuity_publish(int fd)
 
 int main(int argc, char **argv)
 {
+  int c;
   int err;
   int ret;
+  int bat_devno = 0;
+  int cont_devno = 0;
+  const char *ifname = NULL;
   struct ble_npl_task s_task_host;
   struct ble_npl_task s_task_hci;
 
-  if (argc < 2)
+  while ((c = getopt(argc, argv, ":b:c:")) != -1)
+    {
+      switch (c)
+        {
+        case 'b':
+          bat_devno = atoi(optarg);
+          break;
+
+        case 'c':
+          cont_devno = atoi(optarg);
+          break;
+
+        case ':':
+          syslog(LOG_ERR | LOG_USER, "Option -%c requires an argument.\n",
+                 optopt);
+          return EXIT_FAILURE;
+
+        case '?':
+          syslog(LOG_ERR | LOG_USER, "Unknown option '-%c'.\n", optopt);
+          break; /* Don't exit, parse other options */
+
+        default:
+          syslog(LOG_ERR | LOG_USER, "Usage: altitude_fusion [-n devno]\n");
+          return EXIT_FAILURE;
+        }
+    }
+
+  /* Get the interface name */
+
+  if (argc <= optind)
     {
       syslog(LOG_ERR | LOG_USER,
              "Expected Bluetooth interface as argument.\n");
       return EXIT_FAILURE;
     }
 
-  syslog(LOG_INFO | LOG_USER, "btdaemon on %s!\n", argv[1]);
+  ifname = argv[optind];
+  optind++;
 
-  /* TODO: Not sure what this does, I think it initializes the nimble stack? I
-   * ripped this from the example.
-   */
+  syslog(LOG_INFO | LOG_USER, "btdaemon on %s!\n", ifname);
 
-  nimble_port_init();
+  nimble_port_init(); /* Initialize the NimBLE stack. */
 
   /* Initialize services TODO: which ones do I need? */
 
@@ -343,16 +377,17 @@ int main(int argc, char **argv)
   ble_svc_bas_init();  /* Battery */
   ble_svc_dis_init();  /* Device information */
 
-  /* TODO: It would be good to implement the 'binary sensor service' for
-   * continuity channels.
-   * REF:
-   * https://www.bluetooth.com/specifications/specs/binary-sensor-service-1-0/
+  /* Other option for the battery service is to replace it with the Automation
+   * IO Service, which has an Analog Input characteristic:
+   *
+   * https://www.bluetooth.com/specifications/specs/html/?src=aios-v1-0_1751042704/AIOS_v1.0/out/en/index-en.html#UUID-a0f756e4-a888-493a-325b-3866dd579698
    */
 
   /* TODO: We could use object transfer service for transferring log files (?)
    * It might also be beneficial to do this for the fake barometer using
    * Bluetooth; not sure.
-   * REF: https://www.bluetooth.com/specifications/specs/object-transfer-service-1-0/
+   * REF:
+   * https://www.bluetooth.com/specifications/specs/object-transfer-service-1-0/
    */
 
   /* Create task which handles HCI socket */
@@ -382,7 +417,7 @@ int main(int argc, char **argv)
    * passed as an argument).
    */
 
-  g_fds[0].fd = orb_subscribe_multi(ORB_ID(sensor_voltage), 0);
+  g_fds[0].fd = orb_subscribe_multi(ORB_ID(sensor_voltage), bat_devno);
   if (g_fds[0].fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
@@ -391,7 +426,7 @@ int main(int argc, char **argv)
       goto cleanup_fds;
     }
 
-  g_fds[1].fd = orb_subscribe_multi(ORB_ID(sensor_continuity), 0);
+  g_fds[1].fd = orb_subscribe_multi(ORB_ID(sensor_continuity), cont_devno);
   if (g_fds[1].fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
