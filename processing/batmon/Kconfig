@@ -1,0 +1,46 @@
+menuconfig ROCKETALT_PROCESSING_BATMON
+	bool "Battery monitor"
+	depends on ADC
+	default n
+	---help---
+		Enables the program that monitors a battery connected to an ADC channel
+		and ouputs its measurements.
+
+if ROCKETALT_PROCESSING_BATMON
+
+config ROCKETALT_BATMON_VOLTAGE_QLEN
+	int "Battery measurement queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering battery measurements.
+
+config ROCKETALT_BATMON_SWTRIG
+	bool "ADC needs software trigger"
+	default n
+	---help---
+		Enable this if the ADC device needs to have measurements triggered by
+		software before they're available.
+
+if ROCKETALT_BATMON_SWTRIG
+
+config ROCKETALT_BATMON_PERIOD
+	int "Measurement period (s)"
+	default 10
+	---help---
+		Defines the measurement period for the battery monitor (how often an ADC
+		measurement will be taken).
+		
+endif # ROCKETALT_BATMON_SWTRIG
+
+config ROCKETALT_BATMON_ADCRESOLUTION
+	int "ADC resolution (bits)"
+	---help---
+		The ADC's resolution in bits.
+
+config ROCKETALT_BATMON_BATMAX
+	int "Battery max voltage (mV)"
+	---help---
+		The battery's maximum voltage in millivolts.
+
+
+endif # ROCKETALT_PROCESSING_BATMON

@@ -6,22 +6,28 @@ STACKSIZE = $(CONFIG_ROCKETALT_PROCESSING_STACKSIZE)
 
 # Topics to advertise
 
-MAINSRC  += altitude_main.c
+ifeq ($(CONFIG_ROCKETALT_PROCESSING_ALTFUSION),y)
+MAINSRC  += altitude/altitude_main.c
 PROGNAME += altitude_fusion
+endif
 
-MAINSRC  += events_main.c
+ifeq ($(CONFIG_ROCKETALT_PROCESSING_EVENTS),y)
+MAINSRC  += events/events_main.c
 PROGNAME += events_topic
+endif
 
-MAINSRC  += velocity_main.c
+ifeq ($(CONFIG_ROCKETALT_PROCESSING_VELFUSION),y)
+MAINSRC  += velocity/velocity_main.c
 PROGNAME += velocity_fusion
+endif
 
 ifeq ($(CONFIG_ROCKETALT_PROCESSING_BATMON),y)
-MAINSRC  += adcbat_main.c
-PROGNAME += adcbat
+MAINSRC  += batmon/batmon_main.c
+PROGNAME += batmon
 endif
 
 ifeq ($(CONFIG_ROCKETALT_PROCESSING_CONTMON),y)
-MAINSRC  += continuity_main.c
+MAINSRC  += continuity/continuity_main.c
 PROGNAME += continuity
 endif
 

@@ -1,0 +1,56 @@
+menuconfig ROCKETALT_PROCESSING_CONTMON
+	bool "Continuity monitor"
+	depends on ADC
+	default n
+	---help---
+		Enable support for monitoring continuity of deployment channels using an
+		ADC.
+
+if ROCKETALT_PROCESSING_CONTMON
+
+config ROCKETALT_CONTMON_VOLTAGE_QLEN
+	int "Continuity measurement queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering continuity measurements.
+
+config ROCKETALT_CONTMON_NUMCHANS
+	int "Number of channels to monitor"
+	default 1
+	---help---
+		The number of deployment channels to monitor the continuity of.
+
+config ROCKETALT_CONTMON_SWTRIG
+	bool "ADC needs software trigger"
+	default n
+	---help---
+		Enable this if the ADC device needs to have measurements triggered by
+		software before they're available.
+
+if ROCKETALT_CONTMON_SWTRIG
+
+config ROCKETALT_CONTMON_PERIOD
+	int "Measurement period (s)"
+	default 10
+	---help---
+		Defines the measurement period for the battery monitor (how often an ADC
+		measurement will be taken).
+		
+endif # ROCKETALT_CONTMON_SWTRIG
+
+config ROCKETALT_CONTMON_ADCRESOLUTION
+	int "ADC resolution (bits)"
+	---help---
+		The ADC's resolution in bits.
+
+config ROCKETALT_CONTMON_VMAX
+	int "ADC max voltage (mV)"
+	---help---
+		The maximum voltage measured by the ADC in millivolts.
+
+config ROCKETALT_CONTMON_VTHRESH
+	int "Continuity threshold voltage (mV)"
+	---help---
+		The minimum voltage at which the channel is determined to be continuous.
+
+endif # ROCKETALT_PROCESSING_CONTMON

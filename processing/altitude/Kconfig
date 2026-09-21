@@ -1,0 +1,22 @@
+menuconfig ROCKETALT_PROCESSING_ALTFUSION
+	bool "Altitude fusion"
+	default n
+	---help---
+		Enables the program that performs altitude fusion from barometric
+		pressure data.
+
+if ROCKETALT_PROCESSING_ALTFUSION
+
+config ROCKETALT_PROCESSING_ALTFUSION_QLEN
+	int "Altitude queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering altitude measurements.
+
+config ROCKETALT_PROCESSING_HEIGHTFUSION_QLEN
+	int "Height queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering height measurements.
+
+endif # ROCKETALT_PROCESSING_ALTFUSION

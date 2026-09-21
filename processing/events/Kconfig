@@ -1,0 +1,22 @@
+menuconfig ROCKETALT_PROCESSING_EVENTS
+	bool "Flight event detection"
+	default n
+	---help---
+		Enables the program that performs flight event detection from sensor
+		data.
+
+if ROCKETALT_PROCESSING_EVENTS
+
+config ROCKETALT_EVENT_QLEN
+	int "Queue length"
+	default 3
+	---help---
+		The length of the queue to use for buffering flight events.
+
+config ROCKETALT_EVENT_SYSLOG
+	bool "Syslog event output"
+	default n
+	---help---
+		If enabled, flight event changes are syslogged as INFO.
+
+endif # ROCKETALT_PROCESSING_EVENTS
