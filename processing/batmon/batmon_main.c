@@ -41,14 +41,13 @@
 #define MAX_VOLTAGE (4200)
 #endif /* CONFIG_ROCKETALT_BATMON_CHEM_LIION */
 
+/* ADC measurement conversion */
+
+#define ADC_MAX ((2 << (CONFIG_ROCKETALT_BATMON_ADCRESOLUTION - 1)) - 1)
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
-/* ADC measurement conversion */
-
-#define measure_to_volts(r)                                                  \
-  ((r) * MAX_VOLTAGE / CONFIG_ROCKETALT_BATMON_ADCRESOLUTION)
 
 /****************************************************************************
  * Private Function Prototypes
@@ -57,6 +56,26 @@
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Name: measure_to_volts
+ *
+ * Description:
+ *   Turn an ADC measurement into voltage.
+ *
+ * Input Parameters:
+ *   measure - The ADC measurement
+ *
+ * Returned Value:
+ *   Voltage
+ *
+ ****************************************************************************/
+
+static float measure_to_volts(int32_t measure)
+{
+  float millis = (float)(measure) * (float)MAX_VOLTAGE / (float)ADC_MAX;
+  return millis / 1000.0f;
+}
 
 #ifdef CONFIG_ROCKETALT_BATMON_CHEM_UNK
 
@@ -150,7 +169,7 @@ static uint8_t level_from_charge_curve(float voltage)
 {
   /* TODO */
 
-  #error "Unimplemented."
+#error "Unimplemented."
   return 0;
 }
 
@@ -265,7 +284,7 @@ int main(int argc, char **argv)
         }
 
       batdata.timestamp = orb_absolute_time();
-      batdata.voltage = (float)measure_to_volts(adc_data.am_data) / 1000.0f;
+      batdata.voltage = measure_to_volts(adc_data.am_data);
       batdata.level = level_from_charge_curve(batdata.voltage);
 
       err = orb_publish(ORB_ID(sensor_battery), bat_fd, &batdata);
