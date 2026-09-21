@@ -16,6 +16,9 @@
 
 #include <uORB/uORB.h>
 
+#include "sensor/altitude.h"
+#include <sensor/velocity.h>
+
 #include "../../common/common.h"
 
 /****************************************************************************
@@ -33,11 +36,6 @@
 /****************************************************************************
  * Private Types
  ****************************************************************************/
-
-/* Program already knows about altitude and velocity data */
-
-ORB_DECLARE(fusion_altitude);
-ORB_DECLARE(sensor_velocity);
 
 /****************************************************************************
  * Private Data

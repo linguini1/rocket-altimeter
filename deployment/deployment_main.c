@@ -23,6 +23,10 @@
 
 #include <uORB/uORB.h>
 
+#include "sensor/height.h"
+#include "sensor/deploy_event.h"
+#include "sensor/flight_event.h"
+
 #include "../common/common.h"
 #include "../common/config.h"
 
@@ -44,11 +48,6 @@ static_assert(CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS <= CONF_MAX_DEPCHANS,
 
 #define TIMER_SIG SIGALRM
 #define THREAD_CANCEL_SIG SIGUSR1
-
-/* Program already knows flight events and height */
-
-ORB_DECLARE(fusion_height);
-ORB_DECLARE(flight_event);
 
 /****************************************************************************
  * Private Types
@@ -99,17 +98,6 @@ static struct pyrochan_s g_channels[CONFIG_ROCKETALT_DEPLOYMENT_NUMCHANS];
 
 pthread_t g_thread;
 bool g_thread_started; /* Record if we started the thread */
-
-/* Optional debug output format string */
-
-#ifdef CONFIG_DEBUG_UORB
-static const char deploy_event_format[] =
-    "deploy_event - timestamp:%" PRIu64 ",event:%u";
-#endif
-
-/* Definition for deployment event topic */
-
-ORB_DEFINE(deploy_event, struct deploy_event, deploy_event_format);
 
 /* Input topics */
 

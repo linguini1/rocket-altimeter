@@ -18,15 +18,13 @@
 
 #include <uORB/uORB.h>
 
+#include <sensor/voltage.h>
+
 #include "../../common/common.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-/* Program already knows about voltage data */
-
-ORB_DECLARE(sensor_voltage);
 
 /****************************************************************************
  * Private Data

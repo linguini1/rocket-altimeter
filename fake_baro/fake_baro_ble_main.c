@@ -16,13 +16,11 @@
 
 #include <uORB/uORB.h>
 
+#include <sensor/baro.h>
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-/* Program already knows about barometer data */
-
-ORB_DECLARE(sensor_baro);
 
 /****************************************************************************
  * Private Types
