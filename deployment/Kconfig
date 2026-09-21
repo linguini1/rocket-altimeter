@@ -4,7 +4,7 @@
 #
 
 config ROCKETALT_DEPLOYMENT
-	bool "Deployment logic"
+	tristate "Deployment logic"
 	default n
 	depends on UORB
 	depends on USENSOR

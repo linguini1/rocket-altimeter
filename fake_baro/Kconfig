@@ -4,7 +4,7 @@
 #
 
 config ROCKETALT_FAKE_BARO
-	bool "Fake barometer topic"
+	tristate "Fake barometer topic"
 	default n
 	depends on UORB
 	depends on USENSOR
