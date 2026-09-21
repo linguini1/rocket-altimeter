@@ -16,6 +16,10 @@
 
 #include <uORB/uORB.h>
 
+#include "sensor/altitude.h"
+#include "sensor/height.h"
+#include <sensor/baro.h>
+
 #include "../../common/common.h"
 
 /****************************************************************************
@@ -59,28 +63,9 @@ struct topic_s
   const struct orb_metadata *meta; /* Topic metadata */
 };
 
-/* Program already knows about barometer data */
-
-ORB_DECLARE(sensor_baro);
-
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
-/* Optional debug output format string */
-
-#ifdef CONFIG_DEBUG_UORB
-static const char fusion_altitude_format[] =
-    "fusion_altitude - timestamp:%" PRIu64 ",altitude:%hf";
-
-static const char fusion_height_format[] =
-    "fusion_height - timestamp:%" PRIu64 ",height:%hf";
-#endif
-
-/* Definition for altitude topic */
-
-ORB_DEFINE(fusion_altitude, struct fusion_altitude, fusion_altitude_format);
-ORB_DEFINE(fusion_height, struct fusion_height, fusion_height_format);
 
 /* uORB topics we publish */
 

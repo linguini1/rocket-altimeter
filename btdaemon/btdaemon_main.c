@@ -14,6 +14,9 @@
 
 #include <uORB/uORB.h>
 
+#include "sensor/continuity.h"
+#include <sensor/voltage.h>
+
 #include "nimble/nimble_npl.h"
 #include "nimble/nimble_port.h"
 
@@ -36,11 +39,6 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-/* Program already knows about uORB topics */
-
-ORB_DECLARE(sensor_voltage);
-ORB_DECLARE(sensor_continuity);
 
 /****************************************************************************
  * Private Types

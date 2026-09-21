@@ -18,6 +18,10 @@
 
 #include <uORB/uORB.h>
 
+#include "sensor/flight_event.h"
+#include "sensor/height.h"
+#include <sensor/velocity.h>
+
 #include "../../common/common.h"
 #include "../../common/config.h"
 
@@ -71,11 +75,6 @@
 #define HEIGHT_IDX (0)
 #define VEL_IDX (1)
 
-/* Program already knows about some topics */
-
-ORB_DECLARE(fusion_height);
-ORB_DECLARE(sensor_velocity);
-
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -95,17 +94,6 @@ struct topic_s
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
-/* Optional debug output format string */
-
-#ifdef CONFIG_DEBUG_UORB
-static const char flight_event_format[] =
-    "flight_event - timestamp:%" PRIu64 ",event:%u";
-#endif
-
-/* Definition for height topic */
-
-ORB_DEFINE(flight_event, struct flight_event, flight_event_format);
 
 /* Syslog printing flight events */
 

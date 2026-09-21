@@ -11,11 +11,13 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include <nuttx/sensors/sensor.h>
 
 #include <uORB/uORB.h>
-#include <unistd.h>
+
+#include <sensor/baro.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -59,10 +61,6 @@
 /* Celsius to Kelvin conversion factor */
 
 #define CELSIUS_TO_KELVIN (273.0f)
-
-/* Program already knows about barometer data */
-
-ORB_DECLARE(sensor_baro);
 
 /****************************************************************************
  * Private Types

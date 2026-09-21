@@ -20,6 +20,8 @@
 
 #include <uORB/uORB.h>
 
+#include "sensor/continuity.h"
+
 #include "../../common/common.h"
 
 /****************************************************************************
@@ -31,10 +33,6 @@
 #define measure_to_volts(r)                                                  \
   ((r) * CONFIG_ROCKETALT_CONTMON_VMAX /                                     \
    CONFIG_ROCKETALT_CONTMON_ADCRESOLUTION)
-
-/* Program already knows about continuity data */
-
-ORB_DECLARE(sensor_continuity);
 
 /****************************************************************************
  * Private Types
@@ -59,18 +57,6 @@ static struct chan_s g_channels[CONFIG_ROCKETALT_CONTMON_NUMCHANS];
 /* List of file descriptor structures for us to use when polling */
 
 static struct pollfd g_fds[CONFIG_ROCKETALT_CONTMON_NUMCHANS];
-
-/* Optional debug output format string */
-
-#ifdef CONFIG_DEBUG_UORB
-static const char sensor_continuity_format[] =
-    "sensor_continuity - timestamp:%" PRIu64 ",continuous:" PRIu8;
-#endif
-
-/* Definition for continuity topic */
-
-ORB_DEFINE(sensor_continuity, struct sensor_continuity,
-           sensor_continuity_format);
 
 /****************************************************************************
  * Private Function Prototypes

@@ -26,25 +26,6 @@
  * Public Types
  ****************************************************************************/
 
-struct fusion_altitude
-{
-  uint64_t timestamp; /* Timestamp in microseconds */
-  float altitude;     /* Altitude in meters */
-};
-
-struct fusion_height
-{
-  uint64_t timestamp; /* Timestamp in microseconds */
-  float height;       /* Height (from launch altitude) in meters */
-};
-
-struct sensor_continuity
-{
-  uint64_t timestamp; /* Timestamp in microseconds */
-  uint8_t id;         /* Channel ID associated with the measurement */
-  uint8_t continuous; /* Continuous (0 no, 1 yes) */
-};
-
 enum fevent_e
 {
   FEVENT_GROUNDED = 0, /* Rocket is waiting for liftoff */
@@ -52,18 +33,6 @@ enum fevent_e
   FEVENT_APOGEE = 2,   /* Rocket has reached apogee */
   FEVENT_DESCENT = 3,  /* Rocket is descending */
   FEVENT_LANDED = 4,   /* Rocket has landed */
-};
-
-struct flight_event
-{
-  uint64_t timestamp;  /* Timestamp in microseconds */
-  enum fevent_e event; /* Flight event */
-};
-
-struct deploy_event
-{
-  uint64_t timestamp; /* Timestamp in microseconds */
-  uint8_t id;         /* Deployment channel ID */
 };
 
 /* Conditions for deployment */

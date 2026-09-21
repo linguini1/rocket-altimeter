@@ -16,6 +16,10 @@
 
 #include <uORB/uORB.h>
 
+#include <sensor/baro.h>
+#include "sensor/flight_event.h"
+#include "sensor/deploy_event.h"
+
 #include "../common/common.h"
 
 /****************************************************************************
@@ -27,12 +31,6 @@
 #define BARO_IDX (0)
 #define DEP_IDX (1)
 #define FEVENT_IDX (2)
-
-/* Program already knows about necessary uORB data types */
-
-ORB_DECLARE(sensor_baro);
-ORB_DECLARE(deploy_event);
-ORB_DECLARE(flight_event);
 
 /* Log file permissions */
 
