@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
@@ -26,6 +27,20 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* Battery max voltages based on chemistry */
+
+#ifdef CONFIG_ROCKETALT_BATMON_CHEM_UNK
+#define MAX_VOLTAGE (CONFIG_ROCKETALT_BATMON_BATMAX)
+#endif /* CONFIG_ROCKETALT_BATMON_CHEM_UNK */
+
+#ifdef CONFIG_ROCKETALT_BATMON_CHEM_LIPO
+#define MAX_VOLTAGE (4200)
+#endif /* CONFIG_ROCKETALT_BATMON_CHEM_LIPO */
+
+#ifdef CONFIG_ROCKETALT_BATMON_CHEM_LIION
+#define MAX_VOLTAGE (4200)
+#endif /* CONFIG_ROCKETALT_BATMON_CHEM_LIION */
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -33,8 +48,7 @@
 /* ADC measurement conversion */
 
 #define measure_to_volts(r)                                                  \
-  ((r) * CONFIG_ROCKETALT_BATMON_BATMAX /                                    \
-   CONFIG_ROCKETALT_BATMON_ADCRESOLUTION)
+  ((r) * MAX_VOLTAGE / CONFIG_ROCKETALT_BATMON_ADCRESOLUTION)
 
 /****************************************************************************
  * Private Function Prototypes
@@ -43,6 +57,104 @@
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+#ifdef CONFIG_ROCKETALT_BATMON_CHEM_UNK
+
+/****************************************************************************
+ * Name: level_from_charge_curve
+ *
+ * Description:
+ *   Returns the battery level as a percentage given the battery voltage.
+ *   For unknown chemistry.
+ *
+ * Input Parameters:
+ *   voltage - The battery voltage in Volts
+ *
+ * Returned Value:
+ *   The battery level as a percentage.
+ *
+ ****************************************************************************/
+
+static uint8_t level_from_charge_curve(float voltage)
+{
+  uint8_t level;
+
+  /* We'll just perform a linear mapping */
+
+  level = 100 * ((voltage * 1000.0f) / (float)MAX_VOLTAGE);
+  return level;
+}
+
+#endif /* CONFIG_ROCKETALT_BATMON_CHEM_UNK */
+
+#ifdef CONFIG_ROCKETALT_BATMON_CHEM_LIPO
+
+/****************************************************************************
+ * Name: level_from_charge_curve
+ *
+ * Description:
+ *   Returns the battery level as a percentage given the battery voltage.
+ *   For LiPo batteries.
+ *   Taken from: https://github.com/G6EJD/LiPo_Battery_Capacity_Estimator
+ *
+ * Input Parameters:
+ *   voltage - The battery voltage in Volts
+ *
+ * Returned Value:
+ *   The battery level as a percentage.
+ *
+ ****************************************************************************/
+
+static uint8_t level_from_charge_curve(float voltage)
+{
+  float level;
+
+  if (voltage >= 4.2f)
+    {
+      level = 100.0f;
+    }
+  else if (voltage < 3.5f)
+    {
+      level = 0;
+    }
+  else
+    {
+      level = 2808.3808f * powf(voltage, 4) - 43560.9157f * powf(voltage, 3) +
+              252848.5888f * powf(voltage, 2) - 650767.4615f * voltage +
+              626532.5703f;
+    }
+
+  return level;
+}
+
+#endif /* CONFIG_ROCKETALT_BATMON_CHEM_LIPO */
+
+#ifdef CONFIG_ROCKETALT_BATMON_CHEM_LIION
+
+/****************************************************************************
+ * Name: level_from_charge_curve
+ *
+ * Description:
+ *   Returns the battery level as a percentage given the battery voltage.
+ *   For Li-ion battery.
+ *
+ * Input Parameters:
+ *   voltage - The battery voltage in Volts
+ *
+ * Returned Value:
+ *   The battery level as a percentage.
+ *
+ ****************************************************************************/
+
+static uint8_t level_from_charge_curve(float voltage)
+{
+  /* TODO */
+
+  #error "Unimplemented."
+  return 0;
+}
+
+#endif /* CONFIG_ROCKETALT_BATMON_CHEM_LIION */
 
 /****************************************************************************
  * Public Functions
@@ -154,7 +266,7 @@ int main(int argc, char **argv)
 
       batdata.timestamp = orb_absolute_time();
       batdata.voltage = (float)measure_to_volts(adc_data.am_data) / 1000.0f;
-      batdata.level = 0; /* TODO */
+      batdata.level = level_from_charge_curve(batdata.voltage);
 
       err = orb_publish(ORB_ID(sensor_battery), bat_fd, &batdata);
       if (err)

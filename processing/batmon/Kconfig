@@ -14,6 +14,8 @@ config ROCKETALT_BATMON_QLEN
 	---help---
 		The length of the queue to use for buffering battery measurements.
 
+comment "ADC options"
+
 config ROCKETALT_BATMON_SWTRIG
 	bool "ADC needs software trigger"
 	default n
@@ -37,10 +39,37 @@ config ROCKETALT_BATMON_ADCRESOLUTION
 	---help---
 		The ADC's resolution in bits.
 
+comment "Battery options"
+
+choice
+	prompt "Battery chemistry"
+	default ROCKETALT_BATMON_CHEM_UNK
+	
+config ROCKETALT_BATMON_CHEM_UNK
+	bool "Unknown"
+	---help---
+		The battery chemistry is unknown (can also use this option if chemistry
+		is not listed as a supported option).
+
+config ROCKETALT_BATMON_CHEM_LIPO
+	bool "LiPo"
+	---help---
+		Assume the connected battery is a lithium polymer battery.
+
+config ROCKETALT_BATMON_CHEM_LIION
+	bool "Li-Ion"
+	---help---
+		Assume the connected battery is a lithium ion battery.
+
+endchoice # Battery chemistry
+
+if ROCKETALT_BATMON_CHEM_UNK
+
 config ROCKETALT_BATMON_BATMAX
 	int "Battery max voltage (mV)"
 	---help---
 		The battery's maximum voltage in millivolts.
 
+endif # ROCKETALT_BATMON_CHEM_UNK
 
 endif # ROCKETALT_PROCESSING_BATMON
