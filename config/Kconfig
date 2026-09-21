@@ -3,7 +3,7 @@
 # see the file kconfig-language.txt in the NuttX tools repository.
 #
 
-config ROCKETALT_CONF
+menuconfig ROCKETALT_CONF
 	tristate "Configuration tool"
 	default n
 	---help---

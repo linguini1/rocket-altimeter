@@ -3,7 +3,7 @@
 # see the file kconfig-language.txt in the NuttX tools repository.
 #
 
-config ROCKETALT_BTDAEMON
+menuconfig ROCKETALT_BTDAEMON
 	tristate "Bluetooth daemon"
 	default n
 	depends on UORB
