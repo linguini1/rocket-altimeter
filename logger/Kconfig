@@ -3,7 +3,7 @@
 # see the file kconfig-language.txt in the NuttX tools repository.
 #
 
-config ROCKETALT_LOGGER
+menuconfig ROCKETALT_LOGGER
 	tristate "Data logging"
 	default n
 	depends on UORB
