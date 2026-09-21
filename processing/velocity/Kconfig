@@ -1,0 +1,16 @@
+menuconfig ROCKETALT_PROCESSING_VELFUSION
+	bool "Velocity fusion"
+	default n
+	---help---
+		Enables the program that performs velocity fusion from altitude
+		measurements.
+
+if ROCKETALT_PROCESSING_VELFUSION
+
+config ROCKETALT_VELFUSION_QLEN
+	int "Queue length"
+	default 5
+	---help---
+		The length of the queue to use for buffering velocity measurements.
+
+endif # ROCKETALT_PROCESSING_VELFUSION

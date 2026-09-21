@@ -18,8 +18,8 @@
 
 #include <uORB/uORB.h>
 
-#include "../common/common.h"
-#include "../common/config.h"
+#include "../../common/common.h"
+#include "../../common/config.h"
 
 /****************************************************************************
  * Pre-processor Definitions

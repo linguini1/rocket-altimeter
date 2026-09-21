@@ -20,7 +20,7 @@
 
 #include <uORB/uORB.h>
 
-#include "../common/common.h"
+#include "../../common/common.h"
 
 /****************************************************************************
  * Pre-processor Definitions

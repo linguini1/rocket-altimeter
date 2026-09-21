@@ -16,7 +16,7 @@
 
 #include <uORB/uORB.h>
 
-#include "../common/common.h"
+#include "../../common/common.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -89,13 +89,13 @@ static struct topic_s g_topics[] = {
         {
             .fd = -1,
             .meta = ORB_ID(fusion_altitude),
-            .qlen = CONFIG_ROCKETALT_ALTFUSION_QLEN,
+            .qlen = CONFIG_ROCKETALT_PROCESSING_ALTFUSION_QLEN,
         },
     [HEIGHT_IDX] =
         {
             .fd = -1,
             .meta = ORB_ID(fusion_height),
-            .qlen = CONFIG_ROCKETALT_HEIGHTFUSION_QLEN,
+            .qlen = CONFIG_ROCKETALT_PROCESSING_HEIGHTFUSION_QLEN,
         },
 };
 
