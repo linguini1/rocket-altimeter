@@ -14,8 +14,8 @@
 
 #include <uORB/uORB.h>
 
+#include "sensor/battery.h"
 #include "sensor/continuity.h"
-#include <sensor/voltage.h>
 
 #include "nimble/nimble_npl.h"
 #include "nimble/nimble_port.h"
@@ -268,29 +268,20 @@ static FAR void *ble_host_task(FAR void *param)
 static int battery_publish(int fd)
 {
   int err;
-  struct sensor_voltage data;
+  struct sensor_battery data;
 
   /* Read in the data */
 
-  err = orb_copy(ORB_ID(sensor_voltage), fd, &data);
+  err = orb_copy(ORB_ID(sensor_battery), fd, &data);
   if (err)
     {
       syslog(LOG_ERR | LOG_USER, "Couldn't get battery data: %d\n", errno);
       return errno;
     }
 
-  /* Publish over BLE
-   * TODO: we shouldn't be converting from voltage to percentage here.
-   *
-   * Probably the solution is to use a custom uORB type for battery percentage
-   * and we can also tell `batmon` what battery curve to use.
-   *
-   * OR we need to use a different BLE service that can report voltage. This
-   * way the user can plug in batteries with whatever charge curve they like,
-   * and its up to them to determine if the voltage is good or not.
-   */
+  /* Publish over BLE */
 
-  err = ble_svc_bas_battery_level_set(100 * data.voltage / 4.2f);
+  err = ble_svc_bas_battery_level_set(data.level);
   if (err)
     {
       syslog(LOG_ERR | LOG_USER, "Can't publish battery data: %d\n", err);
@@ -419,12 +410,6 @@ int main(int argc, char **argv)
   ble_svc_tps_init(); /* Transmit power */
   ble_svc_bas_init(); /* Battery */
 
-  /* Other option for the battery service is to replace it with the Automation
-   * IO Service, which has an Analog Input characteristic:
-   *
-   * https://www.bluetooth.com/specifications/specs/html/?src=aios-v1-0_1751042704/AIOS_v1.0/out/en/index-en.html#UUID-a0f756e4-a888-493a-325b-3866dd579698
-   */
-
   /* TODO: We could use object transfer service for transferring log files (?)
    * It might also be beneficial to do this for the fake barometer using
    * Bluetooth; not sure.
@@ -459,11 +444,12 @@ int main(int argc, char **argv)
    * passed as an argument).
    */
 
-  g_fds[0].fd = orb_subscribe_multi(ORB_ID(sensor_voltage), bat_devno);
+  g_fds[0].fd = orb_subscribe_multi(ORB_ID(sensor_battery), bat_devno);
   if (g_fds[0].fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
-             "Couldn't subscribe to sensor_voltage0: %d\n", errno);
+             "Couldn't subscribe to sensor_battery%d: %d\n", errno,
+             bat_devno);
       ret = EXIT_FAILURE;
       goto cleanup_fds;
     }
@@ -472,7 +458,8 @@ int main(int argc, char **argv)
   if (g_fds[1].fd < 0)
     {
       syslog(LOG_ERR | LOG_USER,
-             "Couldn't subscribe to sensor_continuity0: %d\n", errno);
+             "Couldn't subscribe to sensor_continuity%d: %d\n", errno,
+             cont_devno);
       ret = EXIT_FAILURE;
       goto cleanup_fds;
     }
