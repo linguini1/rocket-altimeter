@@ -18,7 +18,7 @@
 
 #include <uORB/uORB.h>
 
-#include <sensor/voltage.h>
+#include "sensor/battery.h"
 
 #include "../../common/common.h"
 
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
   uint8_t channo;
   ssize_t bread;
   struct adc_msg_s adc_data;
-  struct sensor_voltage volt;
+  struct sensor_battery batdata;
 
   /* Parse command line arguments */
 
@@ -106,16 +106,16 @@ int main(int argc, char **argv)
 
   /* Set up battery topic for publishing */
 
-  bat_fd = orb_advertise_multi_queue(ORB_ID(sensor_voltage), NULL, &devno,
-                                     CONFIG_ROCKETALT_BATMON_VOLTAGE_QLEN);
+  bat_fd = orb_advertise_multi_queue(ORB_ID(sensor_battery), NULL, &devno,
+                                     CONFIG_ROCKETALT_BATMON_QLEN);
   if (bat_fd < 0)
     {
-      syslog(LOG_ERR | LOG_USER, "Could not advertise sensor_voltage%d: %d\n",
+      syslog(LOG_ERR | LOG_USER, "Could not advertise sensor_battery%d: %d\n",
              devno, errno);
       return EXIT_FAILURE;
     }
 
-  syslog(LOG_INFO | LOG_USER, "sensor_voltage%d advertised.\n", devno);
+  syslog(LOG_INFO | LOG_USER, "sensor_battery%d advertised.\n", devno);
 
   /* Open ADC device */
 
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
       goto clean_bat;
     }
 
-  /* Forever convert ADC measurements to voltage uORB output */
+  /* Forever convert ADC measurements to uORB output */
 
   for (;;)
     {
@@ -152,14 +152,15 @@ int main(int argc, char **argv)
           continue; /* Try again */
         }
 
-      volt.timestamp = orb_absolute_time();
-      volt.voltage = (float)measure_to_volts(adc_data.am_data) / 1000.0f;
+      batdata.timestamp = orb_absolute_time();
+      batdata.voltage = (float)measure_to_volts(adc_data.am_data) / 1000.0f;
+      batdata.level = 0; /* TODO */
 
-      err = orb_publish(ORB_ID(sensor_voltage), bat_fd, &volt);
+      err = orb_publish(ORB_ID(sensor_battery), bat_fd, &batdata);
       if (err)
         {
-          syslog(LOG_ERR | LOG_USER, "Couldn't publish voltage data: %d\n",
-                 errno);
+          syslog(LOG_ERR | LOG_USER,
+                 "Couldn't publish to sensor_battery%d: %d\n", devno, errno);
           continue;
         }
 

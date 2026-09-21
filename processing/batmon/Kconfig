@@ -8,7 +8,7 @@ menuconfig ROCKETALT_PROCESSING_BATMON
 
 if ROCKETALT_PROCESSING_BATMON
 
-config ROCKETALT_BATMON_VOLTAGE_QLEN
+config ROCKETALT_BATMON_QLEN
 	int "Battery measurement queue length"
 	default 5
 	---help---
