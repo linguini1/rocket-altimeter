@@ -26,6 +26,11 @@ MAINSRC  += batmon/batmon_main.c
 PROGNAME += batmon
 endif
 
+ifeq ($(CONFIG_ROCKETALT_PROCESSING_ADCUORB),y)
+MAINSRC  += adc_uorb/adc_uorb_main.c
+PROGNAME += adc_uorb
+endif
+
 ifeq ($(CONFIG_ROCKETALT_PROCESSING_CONTMON),y)
 MAINSRC  += continuity/continuity_main.c
 PROGNAME += continuity

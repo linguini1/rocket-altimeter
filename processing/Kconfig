@@ -34,6 +34,7 @@ comment "Data processing programs"
 source "$APPSDIR/rocket-altimeter/processing/altitude/Kconfig"
 source "$APPSDIR/rocket-altimeter/processing/velocity/Kconfig"
 source "$APPSDIR/rocket-altimeter/processing/events/Kconfig"
+source "$APPSDIR/rocket-altimeter/processing/adc_uorb/Kconfig"
 source "$APPSDIR/rocket-altimeter/processing/batmon/Kconfig"
 source "$APPSDIR/rocket-altimeter/processing/continuity/Kconfig"
 
