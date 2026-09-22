@@ -10,7 +10,7 @@
 
 #ifdef CONFIG_UORB_FORMAT
 static const char deploy_event_format[] =
-    "deploy_event - timestamp:%" PRIu64 ",event:%u";
+    "deploy_event - timestamp:%" PRIu64 ",event:%" PRIu8 "";
 
 #endif
 

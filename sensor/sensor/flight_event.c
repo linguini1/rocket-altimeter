@@ -10,7 +10,7 @@
 
 #ifdef CONFIG_UORB_FORMAT
 static const char flight_event_format[] =
-    "flight_event - timestamp:%" PRIu64 ",event:%u";
+    "flight_event - timestamp:%" PRIu64 ",event:%" PRIu8 "";
 #endif
 
 /****************************************************************************
