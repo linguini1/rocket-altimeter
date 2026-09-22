@@ -10,7 +10,7 @@
 
 #ifdef CONFIG_UORB_FORMAT
 static const char sensor_continuity_format[] =
-    "sensor_continuity - timestamp:%" PRIu64 ",continuous:" PRIu8;
+    "sensor_continuity - timestamp:%" PRIu64 ",continuous:%" PRIu8 "";
 #endif
 
 /****************************************************************************

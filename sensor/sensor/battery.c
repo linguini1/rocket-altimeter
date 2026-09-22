@@ -10,7 +10,7 @@
 
 #ifdef CONFIG_UORB_FORMAT
 static const char sensor_battery_format[] =
-    "sensor_battery - timestamp:%" PRIu64 ",voltage:%hf,level:%" PRIu8;
+    "sensor_battery - timestamp:%" PRIu64 ",voltage:%hf,level:%" PRIu8 "";
 #endif
 
 /****************************************************************************
