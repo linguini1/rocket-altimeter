@@ -1,0 +1,19 @@
+menuconfig ROCKETALT_PROCESSING_ADCUORB
+	bool "ADC to uORB"
+	depends on ADC
+	default n
+	---help---
+		Enables the program that converts ADC measurements into uORB voltage
+		measurements. Each individual ADC channel is given its own uniquely
+		numbered uORB topic.
+
+if ROCKETALT_PROCESSING_ADCUORB
+
+config ROCKETALT_PROCESSING_ADCUORB_QLEN
+	int "Voltage measurement queue length"
+	default 3
+	---help---
+		The length of the uORB queue to use (per topic) for buffering voltage
+		measurements.
+
+endif # ROCKETALT_PROCESSING_ADCUORB
