@@ -128,26 +128,39 @@ service fakebaro fake_baro -n 0 /* Curve barometer using defaults */
 #endif /* CONFIG_ROCKETALT_FAKE_BARO */
 
 #ifdef CONFIG_ROCKETALT_PROCESSING
+
+#ifdef CONFIG_ROCKETALT_PROCESSING_ALTFUSION
 service altitude altitude_fusion
     class processing
     oneshot
+#endif /* CONFIG_ROCKETALT_PROCESSING_ALTFUSION */
 
+#ifdef CONFIG_ROCKETALT_PROCESSING_VELFUSION
 service velocity velocity_fusion
     class processing
     oneshot
+#endif /* CONFIG_ROCKETALT_PROCESSING_VELFUSION */
 
+#ifdef CONFIG_ROCKETALT_PROCESSING_EVENTS
 service events events_topic /data/config.conf
     class processing
     oneshot
+#endif /* CONFIG_ROCKETALT_PROCESSING_EVENTS */
+
+#ifdef CONFIG_ROCKETALT_PROCESSING_ADCUORB
+service adc_uorb adc_uorb -n 0 -s /dev/adc0 4.2 12
+    class processing
+    oneshot
+#endif /* CONFIG_ROCKETALT_PROCESSING_ADCUORB */
 
 #ifdef CONFIG_ROCKETALT_PROCESSING_BATMON
-service batmon adcbat /dev/adc0 2
+service batmon batmon -n 0 0
     class processing
     oneshot
 #endif /* CONFIG_ROCKETALT_PROCESSING_BATMON */
 
 #ifdef CONFIG_ROCKETALT_PROCESSING_CONTMON
-service contmon continuity /dev/adc0 3 /dev/adc0 4
+service contmon continuity -n 0 -c 1 1.2 1 2
     class processing
     oneshot
 #endif /* CONFIG_ROCKETALT_PROCESSING_CONTMON */
