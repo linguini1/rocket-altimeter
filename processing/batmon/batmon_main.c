@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <math.h>
+#include <poll.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
@@ -20,6 +21,7 @@
 #include <uORB/uORB.h>
 
 #include "sensor/battery.h"
+#include <sensor/voltage.h>
 
 #include "../../common/common.h"
 
@@ -41,10 +43,6 @@
 #define MAX_VOLTAGE (4200)
 #endif /* CONFIG_ROCKETALT_BATMON_CHEM_LIION */
 
-/* ADC measurement conversion */
-
-#define ADC_MAX ((2 << (CONFIG_ROCKETALT_BATMON_ADCRESOLUTION - 1)) - 1)
-
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -56,26 +54,6 @@
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
-/****************************************************************************
- * Name: measure_to_volts
- *
- * Description:
- *   Turn an ADC measurement into voltage.
- *
- * Input Parameters:
- *   measure - The ADC measurement
- *
- * Returned Value:
- *   Voltage
- *
- ****************************************************************************/
-
-static float measure_to_volts(int32_t measure)
-{
-  float millis = (float)(measure) * (float)MAX_VOLTAGE / (float)ADC_MAX;
-  return millis / 1000.0f;
-}
 
 #ifdef CONFIG_ROCKETALT_BATMON_CHEM_UNK
 
@@ -185,12 +163,10 @@ int main(int argc, char **argv)
   int err;
   int devno = 0;
   int ret = EXIT_FAILURE;
-  char *adcpath = NULL;
   int bat_fd;
-  int adc_fd;
-  uint8_t channo;
-  ssize_t bread;
-  struct adc_msg_s adc_data;
+  struct pollfd pfd;
+  int topicno;
+  struct sensor_voltage voltage;
   struct sensor_battery batdata;
 
   /* Parse command line arguments */
@@ -213,27 +189,18 @@ int main(int argc, char **argv)
           break; /* Don't exit, parse other options */
 
         default:
-          syslog(LOG_ERR | LOG_USER,
-                 "Usage: adcbat [-n devno] devpath channo\n");
+          syslog(LOG_ERR | LOG_USER, "Usage: adcbat [-n devno] topicno\n");
           return EXIT_FAILURE;
         }
     }
 
   if (argc <= optind)
     {
-      syslog(LOG_ERR | LOG_USER, "Expected ADC device path.\n");
+      syslog(LOG_ERR | LOG_USER, "Expected voltage topic device number.\n");
       return EXIT_FAILURE;
     }
 
-  adcpath = argv[optind++];
-
-  if (argc <= optind)
-    {
-      syslog(LOG_ERR | LOG_USER, "Expected ADC channel number.\n");
-      return EXIT_FAILURE;
-    }
-
-  channo = atoi(argv[optind]); /* Parse channel number */
+  topicno = atoi(argv[optind]);
 
   /* Set up battery topic for publishing */
 
@@ -248,44 +215,47 @@ int main(int argc, char **argv)
 
   syslog(LOG_INFO | LOG_USER, "sensor_battery%d advertised.\n", devno);
 
-  /* Open ADC device */
+  /* Subscribe to voltage topic */
 
-  adc_fd = open(adcpath, O_RDONLY);
-  if (adc_fd < 0)
+  pfd.fd = orb_subscribe_multi(ORB_ID(sensor_voltage), topicno);
+  if (pfd.fd < 0)
     {
-      syslog(LOG_ERR | LOG_USER, "Could not open ADC device %s: %d\n",
-             adcpath, errno);
+      syslog(LOG_ERR | LOG_USER,
+             "Could not subscribe to sensor_voltage%d: %d\n", topicno, errno);
       ret = EXIT_FAILURE;
       goto clean_bat;
     }
 
-  /* Forever convert ADC measurements to uORB output */
+  pfd.revents = 0;
+  pfd.events = POLLIN;
+
+  /* Forever convert voltage measurements to uORB output */
 
   for (;;)
     {
-#ifdef CONFIG_ROCKETALT_BATMON_SWTRIG
-      /* Some ADCs need a conversion to be triggered manually. */
-
-      err = ioctl(adc_fd, ANIOC_TRIGGER, 0);
-      if (err < 0)
+      err = poll(&pfd, 1, -1);
+      if (err <= 0)
         {
-          syslog(LOG_ERR | LOG_USER, "ADC trigger ioctl failed: %d\n", errno);
-          continue;
-        }
-#endif
-
-      /* TODO: Need read to respect `channo` */
-
-      bread = read(adc_fd, &adc_data, sizeof(adc_data));
-      if (bread <= 0)
-        {
-          syslog(LOG_ERR | LOG_USER, "Failed to read ADC: %d\n", errno);
+          syslog(LOG_ERR | LOG_USER, "Failed to poll sensor_voltage%d: %d\n",
+                 topicno, errno);
           continue; /* Try again */
         }
 
-      batdata.timestamp = orb_absolute_time();
-      batdata.voltage = measure_to_volts(adc_data.am_data);
-      batdata.level = level_from_charge_curve(batdata.voltage);
+      /* Get data */
+
+      err = orb_copy(ORB_ID(sensor_voltage), pfd.fd, &voltage);
+      if (err)
+        {
+          if (errno != ENODATA)
+            {
+              syslog(LOG_ERR | LOG_USER, "Couldn't get barometer data: %d\n",
+                     errno);
+            }
+          continue;
+        }
+
+      batdata.timestamp = voltage.timestamp;
+      batdata.level = level_from_charge_curve(voltage.voltage);
 
       err = orb_publish(ORB_ID(sensor_battery), bat_fd, &batdata);
       if (err)
@@ -294,17 +264,9 @@ int main(int argc, char **argv)
                  "Couldn't publish to sensor_battery%d: %d\n", devno, errno);
           continue;
         }
-
-#ifdef CONFIG_ROCKETALT_BATMON_SWTRIG
-      /* If we're manually triggering the ADC, make sure we only do this as
-       * often as the user configured.
-       */
-
-      sleep(CONFIG_ROCKETALT_BATMON_PERIOD);
-#endif
     }
 
-  close(adc_fd);
+  orb_unsubscribe(pfd.fd);
 clean_bat:
   orb_unadvertise(bat_fd);
   return ret;
