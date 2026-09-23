@@ -255,6 +255,7 @@ int main(int argc, char **argv)
         }
 
       batdata.timestamp = voltage.timestamp;
+      batdata.voltage = voltage.voltage;
       batdata.level = level_from_charge_curve(voltage.voltage);
 
       err = orb_publish(ORB_ID(sensor_battery), bat_fd, &batdata);
