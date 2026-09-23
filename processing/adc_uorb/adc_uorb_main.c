@@ -240,7 +240,6 @@ int main(int argc, char **argv)
   int adcfd;
   int num_chans;
   int samples_to_read = 0;
-  uint8_t adc_bits;
   float max_voltage;
   int32_t adc_max;
   struct topic_s *topics = NULL;
@@ -281,7 +280,7 @@ int main(int argc, char **argv)
 
         default:
           syslog(LOG_ERR | LOG_USER, "Usage: adc_uorb [-n devnostart] [-p "
-                                     "period] adcpath maxvoltage adc_bits\n");
+                                     "period] adcpath maxvoltage adc_max\n");
           return EXIT_FAILURE;
         }
     }
@@ -312,12 +311,11 @@ int main(int argc, char **argv)
 
   if (argc <= optind)
     {
-      syslog(LOG_ERR | LOG_USER, "Expected maximum voltage input.\n");
+      syslog(LOG_ERR | LOG_USER, "Expected maximum ADC value.\n");
       return EXIT_FAILURE;
     }
 
-  adc_bits = strtoul(argv[optind], NULL, 10);
-  adc_max = (2 << (adc_bits - 1)) - 1;
+  adc_max = atoi(argv[optind]);
   optind++;
 
   /* First, we must access the ADC device */
