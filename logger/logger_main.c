@@ -4,6 +4,8 @@
 
 #include <nuttx/config.h>
 
+#include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -16,9 +18,9 @@
 
 #include <uORB/uORB.h>
 
-#include <sensor/baro.h>
-#include "sensor/flight_event.h"
 #include "sensor/deploy_event.h"
+#include "sensor/flight_event.h"
+#include <sensor/baro.h>
 
 #include "../common/common.h"
 
@@ -68,21 +70,21 @@ static struct logger_t g_loggers[3] = {
         {
             .meta = ORB_ID(sensor_baro),
             .devno = 0,
-            .fnamefmt = "baro_%d.log",
+            .fnamefmt = "baro_%u.log",
             .xtraflags = 0,
         },
     [DEP_IDX] =
         {
             .meta = ORB_ID(deploy_event),
             .devno = 0,
-            .fnamefmt = "dep_%d.log",
+            .fnamefmt = "dep_%u.log",
             .xtraflags = O_SYNC, /* Sync always due to infrequent events */
         },
     [FEVENT_IDX] =
         {
             .meta = ORB_ID(flight_event),
             .devno = 0,
-            .fnamefmt = "f_event_%d.log",
+            .fnamefmt = "f_event_%u.log",
             .xtraflags = O_SYNC, /* Sync always due to infrequent events */
         },
 };
@@ -99,22 +101,110 @@ static_assert(array_len(g_pollfds) == array_len(g_loggers),
  ****************************************************************************/
 
 /****************************************************************************
+ * Name: extract_fno
+ *
+ * Description:
+ *   Extract the flight number from the file name.
+ *
+ *   WARNING: The flight number is expected to be the first number encountered
+ *   in the file name.
+ *
+ *   WARNING: if `strtoul` somehow fails to parse the flight number, this
+ *   function could return `ULONG_MAX`.
+ *
+ * Input Parameters:
+ *   fname - The file name
+ *
+ * Returned Value:
+ *   The extracted flight no. If none was found, the default value of 0 is
+ *   returned.
+ *
+ ****************************************************************************/
+
+static unsigned extract_fno(const char *fname)
+{
+  size_t len = strlen(fname);
+  size_t i = 0;
+
+  /* Find the first digit character. */
+
+  for (i = 0; i < len; i++)
+    {
+      if (isdigit(fname[i])) break;
+    }
+
+  if (i >= len) return 0; /* We didn't find a digit */
+
+  /* Start parsing the flight number from that first digit. */
+
+  return strtoul(&fname[i], NULL, 0);
+}
+
+/****************************************************************************
  * Name: get_flightno
  *
  * Description:
  *   Get the current flight number so that new flight logs aren't overwritten.
  *
  * Input Parameters:
+ *   - logdir: The logging file directory to search for previous logs
  *
  * Returned Value:
  *   Flight number >= 0 on success, negated errno on error.
  *
  ****************************************************************************/
 
-static int get_flightno(void)
+static unsigned get_flightno(const char *logdir)
 {
-  /* TODO */
-  return 0;
+  unsigned max_fno = 0;
+  unsigned cur_fno;
+  DIR *d;
+  struct dirent *dir;
+
+  /* Open the directory to search */
+
+  d = opendir(logdir);
+  if (d == NULL)
+    {
+      syslog(LOG_ERR | LOG_USER, "Couldn't open directory '%s': %d\n", logdir,
+             errno);
+      return 0;
+    }
+
+  /* Go through the directory and check each file */
+
+  while ((dir = readdir(d)) != NULL)
+    {
+      /* We only want to look at files.
+       *
+       * TODO: the `d_type` field is not specified by POSIX, and may not work
+       * on all systems. It is also kind of a wild west to me whether NuttX
+       * will implement it the same for all file systems (what happens if I
+       * use LittleFS instead of SMARTFS?). Therefore, we should be careful
+       * about this. For now, let's go ahead and trust that NuttX knows what a
+       * file is on this field.
+       */
+
+      if (!DIRENT_ISFILE(dir->d_type))
+        {
+          continue;
+        }
+
+      /* Parse the name to see if there is a flight number in it.
+       *
+       * If the flight number is higher than our maximum, make it the new
+       * maximum.
+       */
+
+      cur_fno = extract_fno(dir->d_name);
+      if (cur_fno > max_fno) max_fno = cur_fno;
+    }
+
+  /* NOTE: we will not bother distinguishing an error from end-of-stream here
+   */
+
+  closedir(d);
+  return max_fno + 1;
 }
 
 /****************************************************************************
@@ -130,7 +220,7 @@ int main(int argc, char **argv)
   int c;
   int err;
   int ret;
-  int flightno;
+  unsigned flightno;
   unsigned fdirlen;
   const char *logdir = NULL;
   struct sensor_baro baro_data[10];
@@ -228,7 +318,8 @@ int main(int argc, char **argv)
           sizeof(g_fname));
   fdirlen = strlen(g_fname); /* Length of the directory name */
   g_fname[fdirlen++] = '/';  /* Trailing slash */
-  flightno = get_flightno();
+  flightno =
+      get_flightno(logdir == NULL ? CONFIG_ROCKETALT_LOGGER_LOGDIR : logdir);
 
   /* Open logging files */
 
