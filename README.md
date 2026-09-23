@@ -22,6 +22,14 @@ tested via emulators or the [NuttX simulator][sim] by enabling the mocking
 capabilities of the tool suite. Most testing has taken place on [Peanut][peanut]
 itself.
 
+**Learn more:**
+
+This tool suite, along with the [Peanut][peanut] altimeter, is the subject of
+one of my [2026 Apache Community over Code conference
+presentations][coc-alt-pres]. I discuss the process of designing an altimeter
+with NuttX in mind, as well as what considerations go into robust firmware
+design and extensible feature support.
+
 ## Installation & Build
 
 In order to use this tool suite, just clone this repository in your
@@ -108,3 +116,4 @@ A list of the applications and their short summary is as follows:
 [sim]: https://nuttx.apache.org/docs/latest/platforms/sim/sim/boards/sim/index.html
 [nxinit]: https://nuttx.apache.org/docs/latest/applications/system/nxinit/index.html
 [uorb]: https://nuttx.apache.org/docs/latest/applications/system/uorb/index.html
+[coc-alt-pres]: https://web.cvent.com/event/ac71ce47-2b5f-424c-abfe-5b48255315fb/summary?session=b94e377f-e18d-4d64-92bf-246464bb62e4&shareLink=true
