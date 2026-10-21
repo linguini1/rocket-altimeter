@@ -1,6 +1,7 @@
 menuconfig ROCKETALT_PROCESSING_ALTFUSION
 	bool "Altitude fusion"
 	default n
+	depends on ROCKETALT_SENSORS
 	---help---
 		Enables the program that performs altitude fusion from barometric
 		pressure data.

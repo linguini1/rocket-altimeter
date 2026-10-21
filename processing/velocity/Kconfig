@@ -1,6 +1,7 @@
 menuconfig ROCKETALT_PROCESSING_VELFUSION
 	bool "Velocity fusion"
 	default n
+	depends on ROCKETALT_SENSORS
 	---help---
 		Enables the program that performs velocity fusion from altitude
 		measurements.

@@ -1,6 +1,7 @@
 menuconfig ROCKETALT_PROCESSING_CONTMON
 	bool "Continuity monitor"
 	default n
+	depends on ROCKETALT_SENSORS
 	---help---
 		Enable support for monitoring continuity of deployment channels using an
 		ADC.

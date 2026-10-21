@@ -1,7 +1,8 @@
 menuconfig ROCKETALT_PROCESSING_ADCUORB
 	bool "ADC to uORB"
-	depends on ADC
 	default n
+	depends on ADC
+	depends on ROCKETALT_SENSORS
 	---help---
 		Enables the program that converts ADC measurements into uORB voltage
 		measurements. Each individual ADC channel is given its own uniquely
