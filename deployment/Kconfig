@@ -8,6 +8,7 @@ menuconfig ROCKETALT_DEPLOYMENT
 	default n
 	depends on UORB
 	depends on USENSOR
+	depends on ROCKETALT_SENSORS
 	depends on !DISABLE_PTHREAD
 	---help---
 		Logic for triggering deployment of recovery systems based on flight

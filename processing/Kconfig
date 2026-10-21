@@ -8,6 +8,7 @@ menuconfig ROCKETALT_PROCESSING
 	default n
 	depends on UORB
 	depends on USENSOR
+	depends on ROCKETALT_SENSORS
 	---help---
 		Primary logic for performing altimeter calculations. Includes altitude
 		estimation, filtering and event detection through the uORB framework.

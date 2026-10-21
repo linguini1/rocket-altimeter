@@ -1,3 +1,5 @@
+ifneq ($(CONFIG_ROCKETALT_SENSORS),)
 CONFIGURED_APPS += $(APPDIR)/rocket-altimeter/sensor
 CFLAGS          += ${INCDIR_PREFIX}$(APPDIR)/rocket-altimeter/sensor
 CXXFLAGS        += ${INCDIR_PREFIX}$(APPDIR)/rocket-altimeter/sensor
+endif

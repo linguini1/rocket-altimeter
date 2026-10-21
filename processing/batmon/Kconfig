@@ -1,6 +1,7 @@
 menuconfig ROCKETALT_PROCESSING_BATMON
 	bool "Battery monitor"
 	default n
+	depends on ROCKETALT_SENSORS
 	---help---
 		Enables the program that monitors a battery connected to a voltage
 		topic.

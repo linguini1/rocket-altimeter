@@ -1,0 +1,6 @@
+config ROCKETALT_SENSORS
+	tristate "Sensor definitions"
+	depends on UORB
+	default n
+	---help---
+		Definitions for sensor/uORB topics used by the rocket altimeter.

@@ -8,6 +8,7 @@ menuconfig ROCKETALT_BTDAEMON
 	default n
 	depends on UORB
 	depends on USENSOR
+	depends on ROCKETALT_SENSORS
 	depends on NIMBLE
 	depends on WIRELESS_BLUETOOTH
 	---help---

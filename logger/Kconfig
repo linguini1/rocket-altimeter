@@ -8,6 +8,7 @@ menuconfig ROCKETALT_LOGGER
 	default n
 	depends on UORB
 	depends on USENSOR
+	depends on ROCKETALT_SENSORS
 	---help---
 		Logs barometer and deployment event data
 
